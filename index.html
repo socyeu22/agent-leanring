@@ -940,6 +940,27 @@ textarea:focus, input:focus { border-color: var(--blue); }
   cursor: pointer;
 }
 .btn-chat-clear:hover { border-color: #ef4444; color: #ef4444; }
+.day-notes-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.day-notes-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.reset-notes-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.reset-notes-btn:hover { color: var(--text-secondary); border-color: var(--border-light); background: var(--bg-hover); }
 </style>
 </head>
 <body>
@@ -1090,22 +1111,6 @@ textarea:focus, input:focus { border-color: var(--blue); }
             <input type="number" class="hours-input" id="wv-hours" min="0" max="40" step="0.5" placeholder="0" oninput="saveHours()">
             <span class="hours-label">giờ</span>
             <span class="hours-total" id="wv-hours-total"></span>
-          </div>
-        </div>
-
-        <div class="block">
-          <div class="block-title"><span class="block-title-icon">📝</span>Ghi chú cá nhân</div>
-          <div class="notes-wrap">
-            <div class="notes-tabs">
-              <button class="notes-tab active" onclick="switchNotesTab('edit')">Chỉnh sửa</button>
-              <button class="notes-tab" onclick="switchNotesTab('preview')">Xem trước</button>
-            </div>
-            <textarea class="notes-textarea" id="wv-notes" placeholder="" oninput="debouncedSaveNotes()"></textarea>
-            <div class="notes-preview" id="wv-notes-preview"></div>
-            <div class="notes-footer">
-              <span class="autosave-hint" id="autosave-hint">Tự động lưu</span>
-              <button id="reset-notes-btn" onclick="resetNotesTemplate()">↺ Khôi phục template</button>
-            </div>
           </div>
         </div>
 
@@ -1880,7 +1885,7 @@ function debounce(fn, ms) {
 function defaultProgress() {
   const wp = {}, hl = {}, wn = {};
   for (let i = 1; i <= 24; i++) { wp[i] = "not-started"; hl[i] = 0; wn[i] = ""; }
-  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, dayChatLinks: {}, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
+  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, dayNotes: {}, dayChatLinks: {}, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
 }
 let progress = defaultProgress();
 
@@ -1892,6 +1897,7 @@ function loadProgress() {
       progress = { ...defaultProgress(), ...stored };
       progress.settings = { ...defaultProgress().settings, ...(stored.settings || {}) };
       if (!progress.dayChatLinks) progress.dayChatLinks = {};
+      if (!progress.dayNotes) progress.dayNotes = {};
     }
   } catch(e) {}
 }
@@ -2143,16 +2149,6 @@ function renderWeekDetail(weekId) {
   const totalHours = getTotalHours();
   document.getElementById("wv-hours-total").textContent = `Tổng: ${formatHours(totalHours)}`;
 
-  // Notes
-  let notes = progress.weekNotes[weekId];
-  if (!notes || notes === "") notes = NOTES_TEMPLATE;
-  document.getElementById("wv-notes").value = notes;
-  document.getElementById("wv-notes-preview").innerHTML = renderMarkdown(notes);
-  document.getElementById("autosave-hint").textContent = "Tự động lưu";
-  document.getElementById("autosave-hint").classList.remove("saved");
-  // Ensure edit tab is active
-  switchNotesTab("edit");
-
   // Prev/Next
   const prevBtn = document.getElementById("btn-prev-week");
   const nextBtn = document.getElementById("btn-next-week");
@@ -2259,6 +2255,7 @@ function renderDays(weekId) {
   if (block) block.style.display = "";
 
   container.innerHTML = days.map(day => {
+    const dayNote = progress.dayNotes[day.id] !== undefined ? progress.dayNotes[day.id] : NOTES_TEMPLATE;
     const savedLink = progress.dayChatLinks[day.id] || "";
     const chatAreaInner = savedLink
       ? `<a class="btn-chat-saved" href="${savedLink.replace(/"/g,'%22')}" target="_blank" rel="noopener noreferrer">↗ Xem chat đã lưu</a><button class="btn-chat-clear" onclick="clearChatLink(${day.id})">×</button>`
@@ -2290,6 +2287,21 @@ function renderDays(weekId) {
         <div class="day-chat-row">
           <a class="btn-claude-open" href="${claudeUrl(day)}" target="_blank" rel="noopener noreferrer">💬 Học với Claude ↗</a>
           <div class="day-chat-link-area" id="chat-area-${day.id}">${chatAreaInner}</div>
+        </div>
+        <div class="day-notes-section">
+          <div class="day-notes-title">📝 Ghi chú ngày ${day.id}</div>
+          <div class="notes-wrap">
+            <div class="notes-tabs">
+              <button class="notes-tab active" onclick="switchDayNotesTab(${day.id},'edit')">Chỉnh sửa</button>
+              <button class="notes-tab" onclick="switchDayNotesTab(${day.id},'preview')">Xem trước</button>
+            </div>
+            <textarea class="notes-textarea" id="day-notes-${day.id}" oninput="saveDayNoteDebounced(${day.id})">${escapeHtml(dayNote)}</textarea>
+            <div class="notes-preview" id="day-notes-preview-${day.id}"></div>
+            <div class="notes-footer">
+              <span class="autosave-hint" id="day-notes-hint-${day.id}">Tự động lưu</span>
+              <button class="reset-notes-btn" onclick="resetDayNotesTemplate(${day.id})">↺ Template</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2342,47 +2354,47 @@ function saveHours() {
   updateMiniStats();
 }
 
-const debouncedSaveNotes = debounce(() => {
-  if (!currentWeekId) return;
-  const notes = document.getElementById("wv-notes").value;
-  progress.weekNotes[currentWeekId] = notes;
+const _dayNoteTimers = {};
+function saveDayNoteDebounced(dayId) {
+  clearTimeout(_dayNoteTimers[dayId]);
+  _dayNoteTimers[dayId] = setTimeout(() => saveDayNote(dayId), 600);
+}
+function saveDayNote(dayId) {
+  const ta = document.getElementById("day-notes-" + dayId);
+  if (!ta) return;
+  progress.dayNotes[dayId] = ta.value;
   saveProgress();
-  const hint = document.getElementById("autosave-hint");
-  hint.textContent = "Đã lưu ✓";
-  hint.classList.add("saved");
-  setTimeout(() => { hint.textContent = "Tự động lưu"; hint.classList.remove("saved"); }, 2000);
-  // Update preview if visible
-  const preview = document.getElementById("wv-notes-preview");
-  if (preview.classList.contains("visible")) {
-    preview.innerHTML = renderMarkdown(notes);
+  const hint = document.getElementById("day-notes-hint-" + dayId);
+  if (hint) {
+    hint.textContent = "Đã lưu ✓"; hint.classList.add("saved");
+    setTimeout(() => { hint.textContent = "Tự động lưu"; hint.classList.remove("saved"); }, 2000);
   }
-}, 600);
-
-function resetNotesTemplate() {
+  const preview = document.getElementById("day-notes-preview-" + dayId);
+  if (preview && preview.classList.contains("visible")) preview.innerHTML = renderMarkdown(ta.value);
+}
+function switchDayNotesTab(dayId, tab) {
+  const ta = document.getElementById("day-notes-" + dayId);
+  const preview = document.getElementById("day-notes-preview-" + dayId);
+  const card = document.getElementById("day-card-" + dayId);
+  const tabs = card ? card.querySelectorAll(".notes-tab") : [];
+  if (tab === "edit") {
+    ta.style.display = ""; preview.classList.remove("visible");
+    if (tabs[0]) tabs[0].classList.add("active");
+    if (tabs[1]) tabs[1].classList.remove("active");
+  } else {
+    preview.innerHTML = renderMarkdown(ta.value);
+    ta.style.display = "none"; preview.classList.add("visible");
+    if (tabs[0]) tabs[0].classList.remove("active");
+    if (tabs[1]) tabs[1].classList.add("active");
+  }
+}
+function resetDayNotesTemplate(dayId) {
   if (!confirm("Khôi phục template mẫu? Ghi chú hiện tại sẽ bị xóa.")) return;
-  document.getElementById("wv-notes").value = NOTES_TEMPLATE;
-  progress.weekNotes[currentWeekId] = NOTES_TEMPLATE;
+  const ta = document.getElementById("day-notes-" + dayId);
+  if (ta) ta.value = NOTES_TEMPLATE;
+  progress.dayNotes[dayId] = NOTES_TEMPLATE;
   saveProgress();
   showToast("Đã khôi phục template", "info");
-}
-
-function switchNotesTab(tab) {
-  const textarea = document.getElementById("wv-notes");
-  const preview = document.getElementById("wv-notes-preview");
-  const tabs = document.querySelectorAll(".notes-tab");
-  if (tab === "edit") {
-    textarea.style.display = "";
-    preview.classList.remove("visible");
-    tabs[0].classList.add("active");
-    tabs[1].classList.remove("active");
-  } else {
-    const notes = textarea.value;
-    preview.innerHTML = renderMarkdown(notes);
-    textarea.style.display = "none";
-    preview.classList.add("visible");
-    tabs[0].classList.remove("active");
-    tabs[1].classList.add("active");
-  }
 }
 
 function setTopicFilter(filter) {
