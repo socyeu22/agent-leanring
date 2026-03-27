@@ -874,6 +874,72 @@ textarea:focus, input:focus { border-color: var(--blue); }
   white-space: pre-wrap;
   word-break: break-word;
 }
+.day-chat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.btn-claude-open {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: #fff;
+  border: none;
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-claude-open:hover { background: linear-gradient(135deg, #6d28d9, #5b21b6); }
+.day-chat-input {
+  flex: 1;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  min-width: 0;
+}
+.day-chat-input:focus { outline: none; border-color: var(--blue); }
+.btn-chat-saved {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--blue);
+  text-decoration: none;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(59,130,246,0.1);
+  border: 1px solid rgba(59,130,246,0.3);
+}
+.btn-chat-saved:hover { background: rgba(59,130,246,0.2); }
+.day-chat-link-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.btn-chat-clear {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.btn-chat-clear:hover { border-color: #ef4444; color: #ef4444; }
 </style>
 </head>
 <body>
@@ -1814,7 +1880,7 @@ function debounce(fn, ms) {
 function defaultProgress() {
   const wp = {}, hl = {}, wn = {};
   for (let i = 1; i <= 24; i++) { wp[i] = "not-started"; hl[i] = 0; wn[i] = ""; }
-  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
+  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, dayChatLinks: {}, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
 }
 let progress = defaultProgress();
 
@@ -1825,6 +1891,7 @@ function loadProgress() {
       const stored = JSON.parse(raw);
       progress = { ...defaultProgress(), ...stored };
       progress.settings = { ...defaultProgress().settings, ...(stored.settings || {}) };
+      if (!progress.dayChatLinks) progress.dayChatLinks = {};
     }
   } catch(e) {}
 }
@@ -2148,6 +2215,31 @@ function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function claudeUrl(day) {
+  const prompt = `Hôm nay tôi học: ${day.title}\n\n🧠 Concept: ${day.concept}\n🔨 Build: ${day.build}\n\nHãy giúp tôi hiểu sâu hơn và thực hành bài này.`;
+  return "https://claude.ai/new?q=" + encodeURIComponent(prompt);
+}
+
+function saveChatLink(dayId, url) {
+  const trimmed = url.trim();
+  progress.dayChatLinks[dayId] = trimmed;
+  saveProgress();
+  const area = document.getElementById("chat-area-" + dayId);
+  if (!area) return;
+  if (trimmed) {
+    area.innerHTML = `<a class="btn-chat-saved" href="${trimmed.replace(/"/g,'%22')}" target="_blank" rel="noopener noreferrer">↗ Xem chat đã lưu</a><button class="btn-chat-clear" onclick="clearChatLink(${dayId})">×</button>`;
+  }
+}
+
+function clearChatLink(dayId) {
+  progress.dayChatLinks[dayId] = "";
+  saveProgress();
+  const area = document.getElementById("chat-area-" + dayId);
+  if (area) {
+    area.innerHTML = `<input class="day-chat-input" id="chat-input-${dayId}" type="url" placeholder="Dán link chat Claude vào đây để lưu..." onchange="saveChatLink(${dayId}, this.value)" />`;
+  }
+}
+
 function toggleDayCard(dayId) {
   const card = document.getElementById("day-card-" + dayId);
   if (!card) return;
@@ -2166,9 +2258,14 @@ function renderDays(weekId) {
   }
   if (block) block.style.display = "";
 
-  container.innerHTML = days.map(day => `
-    <div class="day-card" id="day-card-${day.id}" onclick="toggleDayCard(${day.id})">
-      <div class="day-card-header">
+  container.innerHTML = days.map(day => {
+    const savedLink = progress.dayChatLinks[day.id] || "";
+    const chatAreaInner = savedLink
+      ? `<a class="btn-chat-saved" href="${savedLink.replace(/"/g,'%22')}" target="_blank" rel="noopener noreferrer">↗ Xem chat đã lưu</a><button class="btn-chat-clear" onclick="clearChatLink(${day.id})">×</button>`
+      : `<input class="day-chat-input" id="chat-input-${day.id}" type="url" placeholder="Dán link chat Claude vào đây để lưu..." onchange="saveChatLink(${day.id}, this.value)" />`;
+    return `
+    <div class="day-card" id="day-card-${day.id}">
+      <div class="day-card-header" onclick="toggleDayCard(${day.id})">
         <span class="day-num-badge">Ngày ${day.id}</span>
         <span class="day-card-title">${escapeHtml(day.title)}</span>
         <span class="day-card-arrow">▾</span>
@@ -2190,9 +2287,14 @@ function renderDays(weekId) {
           <div class="day-section-label">✅ Output</div>
           <div class="day-section-content">${escapeHtml(day.output)}</div>
         </div>
+        <div class="day-chat-row">
+          <a class="btn-claude-open" href="${claudeUrl(day)}" target="_blank" rel="noopener noreferrer">💬 Học với Claude ↗</a>
+          <div class="day-chat-link-area" id="chat-area-${day.id}">${chatAreaInner}</div>
+        </div>
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 // =============================================
