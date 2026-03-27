@@ -1,0 +1,2403 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agent — Lộ Trình 24 Tuần</title>
+<style>
+/* ===== DESIGN TOKENS ===== */
+:root {
+  --bg-primary: #0f0f13;
+  --bg-secondary: #14141c;
+  --bg-card: #1a1a26;
+  --bg-hover: #20202e;
+  --border: #2a2a3e;
+  --border-light: #333350;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --concept: #7c3aed;
+  --concept-light: #a78bfa;
+  --concept-bg: rgba(124,58,237,0.12);
+  --code: #0d9488;
+  --code-light: #5eead4;
+  --code-bg: rgba(13,148,136,0.12);
+  --eval: #d97706;
+  --eval-light: #fbbf24;
+  --eval-bg: rgba(217,119,6,0.12);
+
+  --phase1: #7c3aed;
+  --phase2: #0d9488;
+  --phase3: #d97706;
+
+  --green: #22c55e;
+  --blue: #3b82f6;
+  --slate: #475569;
+
+  --sidebar-w: 272px;
+  --topbar-h: 52px;
+  --radius: 8px;
+  --radius-sm: 5px;
+  --transition: 150ms ease;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+[data-theme="light"] {
+  --bg-primary: #f0f2f8;
+  --bg-secondary: #e8eaf2;
+  --bg-card: #ffffff;
+  --bg-hover: #f5f6fc;
+  --border: #d1d5db;
+  --border-light: #e5e7eb;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+/* ===== RESET ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100%;
+  overflow: hidden;
+}
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
+textarea, input { font: inherit; color: inherit; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; outline: none; }
+textarea:focus, input:focus { border-color: var(--blue); }
+
+/* ===== APP LAYOUT ===== */
+#app {
+  display: grid;
+  grid-template-rows: var(--topbar-h) 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ===== TOPBAR ===== */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+}
+.logo {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+.logo span { color: var(--concept-light); }
+.filter-pills {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+.filter-pill {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+.filter-pill:hover { border-color: var(--border-light); color: var(--text-primary); }
+.filter-pill.active[data-filter="all"] { background: var(--bg-hover); border-color: var(--border-light); color: var(--text-primary); }
+.filter-pill.active[data-filter="concept"] { background: var(--concept-bg); border-color: var(--concept); color: var(--concept-light); }
+.filter-pill.active[data-filter="code"] { background: var(--code-bg); border-color: var(--code); color: var(--code-light); }
+.filter-pill.active[data-filter="eval"] { background: var(--eval-bg); border-color: var(--eval); color: var(--eval-light); }
+#hamburger {
+  display: none;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+#hamburger:hover { background: var(--bg-hover); }
+#theme-toggle {
+  width: 32px; height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+#theme-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ===== BODY LAYOUT ===== */
+#layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* ===== SIDEBAR ===== */
+#sidebar {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#sidebar-mini-stats {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mini-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.mini-ring-wrap {
+  position: relative;
+  width: 44px; height: 44px;
+  flex-shrink: 0;
+}
+.mini-ring-wrap svg { transform: rotate(-90deg); }
+.mini-ring-bg { fill: none; stroke: var(--border); stroke-width: 4; }
+.mini-ring-fg { fill: none; stroke: var(--concept-light); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+.mini-ring-text {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  color: var(--text-primary);
+}
+.mini-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.mini-stat {
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+.mini-stat-val { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.mini-stat-lbl { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+
+/* Week nav */
+#week-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#week-nav::-webkit-scrollbar { width: 4px; }
+#week-nav::-webkit-scrollbar-track { background: transparent; }
+#week-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.phase-group { margin-bottom: 4px; }
+.phase-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.phase-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.phase-arrow {
+  margin-left: auto;
+  font-size: 10px;
+  transition: transform var(--transition);
+}
+.phase-group.collapsed .phase-arrow { transform: rotate(-90deg); }
+.phase-group.collapsed .phase-weeks { display: none; }
+
+.week-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 18px;
+  cursor: pointer;
+  border-radius: 0;
+  transition: background var(--transition);
+  border-left: 2px solid transparent;
+}
+.week-item:hover { background: var(--bg-hover); }
+.week-item.active {
+  background: var(--bg-card);
+  border-left-color: var(--concept-light);
+}
+.week-item.active .week-item-label { color: var(--text-primary); }
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--slate);
+  background: transparent;
+  transition: var(--transition);
+}
+.status-dot.completed { background: var(--green); border-color: var(--green); }
+.status-dot.in-progress {
+  background: var(--blue);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(59,130,246,0.15); }
+}
+.week-item-label {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.week-item-num {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Dashboard link */
+#dashboard-link {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  margin: 4px 8px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: var(--transition);
+  border: 1px solid transparent;
+}
+#dashboard-link:hover { background: var(--bg-hover); color: var(--text-primary); }
+#dashboard-link.active { background: var(--bg-card); border-color: var(--border); color: var(--text-primary); }
+#dashboard-link span:first-child { font-size: 14px; }
+
+/* ===== MAIN CONTENT ===== */
+#main-content {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#main-content::-webkit-scrollbar { width: 6px; }
+#main-content::-webkit-scrollbar-track { background: transparent; }
+#main-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ===== DASHBOARD ===== */
+#dashboard-view {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 28px 60px;
+}
+.dash-header { margin-bottom: 20px; }
+.dash-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.dash-header p { color: var(--text-muted); font-size: 13px; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.stat-card-val {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-card-lbl { font-size: 12px; color: var(--text-muted); }
+.stat-card-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.phase-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.phase-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.phase-card:hover { border-color: var(--border-light); transform: translateY(-1px); }
+.phase-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.phase-card-title { font-size: 13px; font-weight: 700; }
+.phase-card-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.phase-card-project { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+.phase-bar-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.phase-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+.phase-card-counts { font-size: 11px; color: var(--text-muted); }
+
+/* Timeline */
+.timeline-wrap { margin-bottom: 28px; }
+.timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+.timeline-cell {
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  transition: var(--transition);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  position: relative;
+}
+.timeline-cell:hover { border-color: var(--border-light); transform: scale(1.05); }
+.timeline-cell.completed { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: var(--green); }
+.timeline-cell.in-progress { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.5); color: var(--blue); }
+.timeline-cell .tc-num { font-size: 13px; font-weight: 800; }
+.timeline-cell .tc-lbl { font-size: 9px; font-weight: 500; opacity: 0.7; }
+.timeline-cell .tc-dot {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+}
+.timeline-cell.completed .tc-dot { background: var(--green); }
+.timeline-cell.in-progress .tc-dot { background: var(--blue); }
+
+/* ===== WEEK DETAIL ===== */
+#week-view {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 28px 28px 80px;
+}
+.week-view-header { margin-bottom: 24px; }
+.week-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.phase-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+.difficulty-stars { font-size: 13px; color: var(--eval-light); }
+.week-num-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.week-view-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+.week-view-subtopic { font-size: 14px; color: var(--text-muted); margin-bottom: 14px; }
+.status-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.status-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  transition: var(--transition);
+}
+.status-btn:hover { border-color: var(--border-light); color: var(--text-secondary); }
+.status-btn.active[data-status="not-started"] { border-color: var(--slate); color: #94a3b8; background: rgba(71,85,105,0.15); }
+.status-btn.active[data-status="in-progress"] { border-color: var(--blue); color: #93c5fd; background: rgba(59,130,246,0.15); }
+.status-btn.active[data-status="completed"] { border-color: var(--green); color: #86efac; background: rgba(34,197,94,0.15); }
+
+/* Blocks */
+.block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+}
+.block-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.block-title-icon { font-size: 14px; }
+
+/* Core questions */
+.question-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.question-list li {
+  display: flex;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+.question-list li::before { content: "›"; color: var(--concept-light); font-weight: 700; flex-shrink: 0; }
+
+/* Topics */
+.topics-filter-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.topic-filter-btn {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  transition: var(--transition);
+}
+.topic-filter-btn:hover { border-color: var(--border-light); color: var(--text-secondary); }
+.topic-filter-btn.active { border-color: var(--border-light); color: var(--text-primary); background: var(--bg-hover); }
+.topic-list { display: flex; flex-direction: column; gap: 6px; }
+.topic-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  transition: var(--transition);
+}
+.topic-item:hover { background: var(--bg-hover); }
+.topic-item[data-type="concept"] { border-left-color: var(--concept); }
+.topic-item[data-type="code"] { border-left-color: var(--code); }
+.topic-item[data-type="eval"] { border-left-color: var(--eval); }
+.type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  height: fit-content;
+  margin-top: 1px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.type-badge.concept { background: var(--concept-bg); color: var(--concept-light); border: 1px solid rgba(124,58,237,0.3); }
+.type-badge.code { background: var(--code-bg); color: var(--code-light); border: 1px solid rgba(13,148,136,0.3); }
+.type-badge.eval { background: var(--eval-bg); color: var(--eval-light); border: 1px solid rgba(217,119,6,0.3); }
+.topic-text { font-size: 13.5px; color: var(--text-secondary); flex: 1; }
+.topic-new-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(251,191,36,0.15);
+  color: var(--eval-light);
+  border: 1px solid rgba(217,119,6,0.3);
+  flex-shrink: 0;
+  height: fit-content;
+  margin-top: 2px;
+}
+
+/* Deliverable */
+.deliverable-box {
+  background: linear-gradient(135deg, rgba(124,58,237,0.08) 0%, rgba(13,148,136,0.08) 100%);
+  border-color: rgba(124,58,237,0.25);
+}
+.deliverable-text { font-size: 14px; color: var(--text-primary); }
+.deliverable-text strong { color: var(--concept-light); }
+
+/* Resources */
+.resource-list { display: flex; flex-direction: column; gap: 8px; }
+.resource-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+.resource-card:hover { border-color: var(--border-light); background: var(--bg-hover); transform: translateX(2px); }
+.resource-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.resource-body { flex: 1; min-width: 0; }
+.resource-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.resource-desc { font-size: 12px; color: var(--text-muted); }
+.resource-type-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+  height: fit-content;
+}
+.resource-arrow { color: var(--text-muted); font-size: 12px; flex-shrink: 0; margin-top: 3px; }
+
+/* Hours */
+.hours-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hours-input {
+  width: 80px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+.hours-label { color: var(--text-muted); font-size: 13px; }
+.hours-total { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
+/* Notes */
+.notes-wrap { position: relative; }
+.notes-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: -1px;
+}
+.notes-tab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.notes-tab.active {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+.notes-textarea {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+.notes-textarea:focus { border-color: var(--blue); outline: none; }
+.notes-preview {
+  width: 100%;
+  min-height: 160px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-y: auto;
+  display: none;
+}
+.notes-preview.visible { display: block; }
+/* Markdown preview styles */
+.notes-preview h2 { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 10px 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.notes-preview h3 { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin: 8px 0 4px; }
+.notes-preview p { color: var(--text-secondary); margin-bottom: 6px; }
+.notes-preview ul, .notes-preview ol { color: var(--text-secondary); padding-left: 18px; margin-bottom: 6px; }
+.notes-preview li { margin-bottom: 2px; }
+.notes-preview code { background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-family: 'Menlo','Monaco','Consolas',monospace; font-size: 12px; color: var(--code-light); }
+.notes-preview pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px; overflow-x: auto; }
+.notes-preview pre code { background: none; border: none; padding: 0; color: var(--code-light); font-size: 12px; }
+.notes-preview strong { color: var(--text-primary); font-weight: 700; }
+.notes-preview em { color: var(--eval-light); font-style: italic; }
+.notes-preview blockquote { border-left: 3px solid var(--concept); padding-left: 10px; margin-left: 0; color: var(--text-muted); }
+.notes-preview a { color: var(--concept-light); text-decoration: underline; }
+.notes-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.autosave-hint { font-size: 11px; color: var(--text-muted); }
+.autosave-hint.saved { color: var(--green); }
+#reset-notes-btn {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+#reset-notes-btn:hover { border-color: var(--border); color: var(--text-secondary); background: var(--bg-hover); }
+
+/* Week nav footer */
+.week-nav-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.week-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: var(--transition);
+  background: var(--bg-card);
+  min-width: 120px;
+}
+.week-nav-btn:hover:not(:disabled) { border-color: var(--border-light); color: var(--text-primary); background: var(--bg-hover); }
+.week-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.week-nav-btn.next { margin-left: auto; justify-content: flex-end; }
+.week-nav-btn-sub { font-size: 11px; color: var(--text-muted); display: block; }
+
+/* Toast */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+  z-index: 999;
+  transform: translateY(8px);
+  opacity: 0;
+  transition: all 0.25s ease;
+  pointer-events: none;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.success { border-color: rgba(34,197,94,0.4); color: var(--green); }
+#toast.info { border-color: rgba(59,130,246,0.4); color: var(--blue); }
+
+/* Sidebar overlay (mobile) */
+#sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 49;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  #hamburger { display: flex; }
+  #layout { grid-template-columns: 1fr; }
+  #sidebar {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  #sidebar.open { transform: translateX(0); }
+  #sidebar-overlay.show { display: block; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .phase-cards { grid-template-columns: 1fr; }
+  .timeline-grid { grid-template-columns: repeat(6, 1fr); }
+  #dashboard-view, #week-view { padding: 16px 16px 60px; }
+  .week-view-title { font-size: 20px; }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .timeline-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ===== DAY CARDS ===== */
+.day-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color var(--transition);
+}
+.day-card:hover { border-color: var(--border-light); }
+.day-card.open { border-color: var(--blue); }
+
+.day-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.day-card-header:hover { background: var(--bg-hover); }
+
+.day-num-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.day-card.open .day-num-badge {
+  color: var(--blue);
+  border-color: var(--blue);
+  background: rgba(59,130,246,0.1);
+}
+
+.day-card-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.day-card-arrow {
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+  flex-shrink: 0;
+}
+.day-card.open .day-card-arrow { transform: rotate(180deg); }
+
+.day-card-body {
+  display: none;
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--border);
+}
+.day-card.open .day-card-body { display: block; }
+
+.day-section {
+  margin-top: 10px;
+}
+.day-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.day-section-content {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- TOPBAR -->
+  <nav id="topbar">
+    <button id="hamburger" onclick="toggleSidebar()">☰</button>
+    <div class="logo">AI Agent <span>Lộ Trình</span></div>
+    <div class="filter-pills">
+      <button class="filter-pill active" data-filter="all">Tất cả</button>
+      <button class="filter-pill" data-filter="concept">Concept</button>
+      <button class="filter-pill" data-filter="code">Code</button>
+      <button class="filter-pill" data-filter="eval">Eval</button>
+    </div>
+    <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+  </nav>
+
+  <div id="layout">
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <div id="sidebar-mini-stats">
+        <div class="mini-progress-wrap">
+          <div class="mini-ring-wrap">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <circle class="mini-ring-bg" cx="22" cy="22" r="18"/>
+              <circle class="mini-ring-fg" id="mini-ring-fg" cx="22" cy="22" r="18"
+                stroke-dasharray="113.1" stroke-dashoffset="113.1"/>
+            </svg>
+            <div class="mini-ring-text" id="mini-ring-pct">0%</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:2px" id="mini-done-label">0 / 24 tuần</div>
+            <div style="font-size:11px;color:var(--text-muted)">hoàn thành</div>
+          </div>
+        </div>
+        <div class="mini-stats-grid">
+          <div class="mini-stat">
+            <div class="mini-stat-val" id="mini-hours">0h</div>
+            <div class="mini-stat-lbl">Giờ học</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-stat-val" id="mini-streak">T1</div>
+            <div class="mini-stat-lbl">Tuần hiện tại</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="week-nav">
+        <div id="dashboard-link" onclick="navigateToDashboard()" class="active">
+          <span>📊</span>
+          <span>Dashboard</span>
+        </div>
+        <!-- week nav rendered by JS -->
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content">
+      <!-- DASHBOARD VIEW -->
+      <section id="dashboard-view">
+        <div class="dash-header">
+          <h1>Lộ Trình AI Agent — 24 Tuần</h1>
+          <p>5 giờ/tuần · 120 giờ tổng · 3 portfolio projects</p>
+        </div>
+
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card-val" id="stat-pct" style="color:var(--concept-light)">0%</div>
+            <div class="stat-card-lbl">Hoàn thành</div>
+            <div class="stat-card-sub" id="stat-pct-sub">0 / 24 tuần</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-val" id="stat-hours" style="color:var(--code-light)">0h</div>
+            <div class="stat-card-lbl">Giờ đã học</div>
+            <div class="stat-card-sub">120h mục tiêu</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-val" id="stat-week" style="color:var(--eval-light)">T1</div>
+            <div class="stat-card-lbl">Tuần hiện tại</div>
+            <div class="stat-card-sub" id="stat-week-title">Bắt đầu học!</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-val" id="stat-days" style="color:var(--green)">0</div>
+            <div class="stat-card-lbl">Ngày học</div>
+            <div class="stat-card-sub" id="stat-start">Chưa bắt đầu</div>
+          </div>
+        </div>
+
+        <div class="section-title">Tiến độ theo giai đoạn</div>
+        <div class="phase-cards" id="phase-cards"></div>
+
+        <div class="section-title timeline-wrap">Timeline</div>
+        <div class="timeline-grid" id="timeline-grid"></div>
+      </section>
+
+      <!-- WEEK DETAIL VIEW -->
+      <section id="week-view" style="display:none">
+        <div class="week-view-header">
+          <div class="week-meta-row">
+            <span class="phase-badge" id="wv-phase-badge"></span>
+            <span class="difficulty-stars" id="wv-difficulty"></span>
+            <span class="week-num-badge" id="wv-week-num"></span>
+          </div>
+          <h1 class="week-view-title" id="wv-title"></h1>
+          <div class="week-view-subtopic" id="wv-subtopic"></div>
+          <div class="status-btns" id="wv-status-btns">
+            <button class="status-btn" data-status="not-started" onclick="setWeekStatus(currentWeekId,'not-started')">Chưa bắt đầu</button>
+            <button class="status-btn" data-status="in-progress" onclick="setWeekStatus(currentWeekId,'in-progress')">⟳ Đang học</button>
+            <button class="status-btn" data-status="completed" onclick="setWeekStatus(currentWeekId,'completed')">✓ Hoàn thành</button>
+          </div>
+        </div>
+
+        <div class="block" id="wv-questions-block">
+          <div class="block-title"><span class="block-title-icon">💡</span>Câu hỏi cốt lõi</div>
+          <ul class="question-list" id="wv-questions"></ul>
+        </div>
+
+        <div class="block">
+          <div class="block-title"><span class="block-title-icon">📚</span>Nội dung học
+            <div class="topics-filter-row" style="margin-left:auto;margin-bottom:0">
+              <button class="topic-filter-btn active" data-tf="all" onclick="setTopicFilter('all')">Tất cả</button>
+              <button class="topic-filter-btn" data-tf="concept" onclick="setTopicFilter('concept')">Concept</button>
+              <button class="topic-filter-btn" data-tf="code" onclick="setTopicFilter('code')">Code</button>
+              <button class="topic-filter-btn" data-tf="eval" onclick="setTopicFilter('eval')">Eval</button>
+            </div>
+          </div>
+          <div class="topic-list" id="wv-topics"></div>
+        </div>
+
+        <div class="block" id="wv-days-block">
+          <div class="block-title"><span class="block-title-icon">📅</span>Kế hoạch 5 ngày</div>
+          <div id="wv-days"></div>
+        </div>
+
+        <div class="block deliverable-box">
+          <div class="block-title"><span class="block-title-icon">🎯</span>Deliverable tuần này</div>
+          <div class="deliverable-text" id="wv-deliverable"></div>
+        </div>
+
+        <div class="block" id="wv-resources-block">
+          <div class="block-title"><span class="block-title-icon">🔗</span>Tài nguyên</div>
+          <div class="resource-list" id="wv-resources"></div>
+        </div>
+
+        <div class="block">
+          <div class="block-title"><span class="block-title-icon">⏱</span>Giờ đã học tuần này</div>
+          <div class="hours-row">
+            <input type="number" class="hours-input" id="wv-hours" min="0" max="40" step="0.5" placeholder="0" oninput="saveHours()">
+            <span class="hours-label">giờ</span>
+            <span class="hours-total" id="wv-hours-total"></span>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="block-title"><span class="block-title-icon">📝</span>Ghi chú cá nhân</div>
+          <div class="notes-wrap">
+            <div class="notes-tabs">
+              <button class="notes-tab active" onclick="switchNotesTab('edit')">Chỉnh sửa</button>
+              <button class="notes-tab" onclick="switchNotesTab('preview')">Xem trước</button>
+            </div>
+            <textarea class="notes-textarea" id="wv-notes" placeholder="" oninput="debouncedSaveNotes()"></textarea>
+            <div class="notes-preview" id="wv-notes-preview"></div>
+            <div class="notes-footer">
+              <span class="autosave-hint" id="autosave-hint">Tự động lưu</span>
+              <button id="reset-notes-btn" onclick="resetNotesTemplate()">↺ Khôi phục template</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="week-nav-footer">
+          <button class="week-nav-btn prev" id="btn-prev-week" onclick="navigatePrev()">
+            ← <span><span class="week-nav-btn-sub" id="prev-week-label"></span></span>
+          </button>
+          <button class="week-nav-btn next" id="btn-next-week" onclick="navigateNext()">
+            <span><span class="week-nav-btn-sub" id="next-week-label"></span></span> →
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+<div id="toast"></div>
+
+<script>
+// =============================================
+// CURRICULUM DATA
+// =============================================
+const PHASES = [
+  { id: 1, title: "Giai đoạn 1", titleLong: "Kiến Trúc Agent & Tool Use", weeks: [1,2,3,4,5,6,7,8,9,10], project: "CLI Research Agent", color: "#7c3aed" },
+  { id: 2, title: "Giai đoạn 2", titleLong: "Hệ Thống Multi-Agent", weeks: [11,12,13,14,15,16,17], project: "Multi-Agent Content Pipeline", color: "#0d9488" },
+  { id: 3, title: "Giai đoạn 3", titleLong: "Production-Grade Systems", weeks: [18,19,20,21,22,23,24], project: "Production Deployment", color: "#d97706" }
+];
+
+const WEEKS = [
+  {
+    id: 1, phase: 1,
+    title: "Tổng quan về AI Agent",
+    subtopic: "Mental model, loop, 4 thành phần",
+    difficulty: 1,
+    questions: [
+      "AI Agent khác gì so với chatbot thông thường?",
+      "Vòng lặp think → act → observe hoạt động như thế nào?",
+      "State là gì và tại sao nó quan trọng với Agent?"
+    ],
+    topics: [
+      { label: "Chatbot vs Agent — sự khác biệt cốt lõi", type: "concept" },
+      { label: "Loop: think → act → observe", type: "concept" },
+      { label: "4 thành phần: LLM, Memory, Tools, Planning", type: "concept" },
+      { label: "State là gì và tại sao quan trọng", type: "concept", isNew: true },
+    ],
+    deliverable: "Setup repo, Python environment, gọi Claude API từ terminal",
+    resources: [
+      { title: "LLM Powered Autonomous Agents", author: "Lilian Weng", type: "blog", url: "https://lilianweng.github.io/posts/2023-06-23-agent/", desc: "Tổng quan đầy đủ về LLM agents — đọc phần Overview và Memory" },
+      { title: "Anthropic Claude API — Getting Started", type: "docs", url: "https://docs.anthropic.com/en/api/getting-started", desc: "Hướng dẫn setup API key và gọi API đầu tiên" },
+      { title: "Claude API Documentation", type: "docs", url: "https://docs.anthropic.com/en/docs/welcome", desc: "Tài liệu chính thức của Anthropic" },
+    ]
+  },
+  {
+    id: 2, phase: 1,
+    title: "ReAct — Core Loop",
+    subtopic: "Reason + Act, stopping condition",
+    difficulty: 2,
+    questions: [
+      "ReAct hoạt động từng bước như thế nào?",
+      "Tại sao cần xen kẽ Reasoning và Acting?",
+      "Stopping condition được xác định như thế nào?"
+    ],
+    topics: [
+      { label: "ReAct hoạt động từng bước như thế nào", type: "concept" },
+      { label: "Tại sao xen kẽ Reason và Act", type: "concept" },
+      { label: "Stopping condition và max_iterations", type: "concept" },
+      { label: "Implement ReAct loop thủ công (không dùng framework)", type: "code" },
+    ],
+    deliverable: "Viết ReAct loop với 1 tool: get_current_time()",
+    resources: [
+      { title: "ReAct: Synergizing Reasoning and Acting in LLMs", type: "paper", url: "https://arxiv.org/abs/2210.03629", desc: "Paper gốc mô tả ReAct pattern — đọc phần Introduction và Method" },
+      { title: "Tool Use Overview — Anthropic", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview", desc: "Cơ chế function calling với Anthropic API" },
+      { title: "Anthropic Cookbook", type: "github", url: "https://github.com/anthropics/anthropic-cookbook", desc: "Tập hợp ví dụ thực tế từ Anthropic" },
+    ]
+  },
+  {
+    id: 3, phase: 1,
+    title: "Planning Strategies",
+    subtopic: "Plan-and-Execute, ToT, Reflexion",
+    difficulty: 2,
+    questions: [
+      "Plan-and-Execute khác ReAct ở điểm nào?",
+      "Tree of Thought giải quyết vấn đề gì mà ReAct không làm được?",
+      "Reflexion tự cải thiện qua cơ chế nào?"
+    ],
+    topics: [
+      { label: "Plan-and-Execute vs ReAct — khi nào dùng cái gì", type: "concept" },
+      { label: "Tree of Thought — khám phá song song", type: "concept" },
+      { label: "Reflexion — vòng lặp tự phê bình", type: "concept" },
+      { label: "Thêm Reflexion vào ReAct loop từ tuần 2", type: "code" },
+    ],
+    deliverable: "ReAct loop + self-critique: agent tự đánh giá và cải thiện câu trả lời",
+    resources: [
+      { title: "Tree of Thoughts: Deliberate Problem Solving", type: "paper", url: "https://arxiv.org/abs/2305.10601", desc: "Paper ToT — khám phá song song nhiều hướng suy nghĩ" },
+      { title: "Reflexion: Language Agents with Verbal Reinforcement", type: "paper", url: "https://arxiv.org/abs/2303.11366", desc: "Paper Reflexion — agent học từ lỗi qua reflection" },
+      { title: "Lilian Weng: LLM Agents — Planning section", type: "blog", url: "https://lilianweng.github.io/posts/2023-06-23-agent/", desc: "Phần Planning trong bài viết tổng quan" },
+    ]
+  },
+  {
+    id: 4, phase: 1,
+    title: "Tool Use — Cơ Chế & Thiết Kế",
+    subtopic: "Function calling, tool schema",
+    difficulty: 2,
+    questions: [
+      "LLM biết cách gọi tool như thế nào?",
+      "Tại sao mô tả tool quan trọng hơn tên tool?",
+      "Nguyên tắc nào để viết tool schema tốt?"
+    ],
+    topics: [
+      { label: "Cơ chế Function Calling với Anthropic API", type: "code" },
+      { label: "Tại sao mô tả tool quan trọng hơn tên tool", type: "concept" },
+      { label: "Nguyên tắc viết tool schema tốt", type: "concept" },
+      { label: "Đo chất lượng chọn tool lần đầu", type: "eval", isNew: true },
+    ],
+    deliverable: "Build 3 production-ready tools: web_search, calculate, save_note",
+    resources: [
+      { title: "Tool Use Best Practices — Anthropic", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview", desc: "Hướng dẫn thiết kế và sử dụng tool hiệu quả" },
+      { title: "Implementing Tool Use — Anthropic", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use", desc: "Hướng dẫn implement tool use chi tiết" },
+      { title: "Anthropic Cookbook: Tool Use Examples", type: "github", url: "https://github.com/anthropics/anthropic-cookbook/tree/main/tool_use", desc: "Ví dụ thực tế về tool use" },
+    ]
+  },
+  {
+    id: 5, phase: 1,
+    title: "Tool Use — Advanced Patterns",
+    subtopic: "Sequential, parallel, error handling",
+    difficulty: 2,
+    questions: [
+      "Sequential vs parallel tool calls: khi nào dùng cái gì?",
+      "Xử lý tool failure như thế nào để agent không bị crash?",
+      "Logging tool calls giúp debug ra sao?"
+    ],
+    topics: [
+      { label: "Sequential vs parallel tool calls", type: "concept" },
+      { label: "Xử lý tool failure — retry & fallback", type: "code" },
+      { label: "Tool result validation", type: "code" },
+      { label: "Log tool calls để debug", type: "eval", isNew: true },
+    ],
+    deliverable: "Agent xử lý tool failure gracefully, có basic logging",
+    resources: [
+      { title: "Parallel Tool Use — Anthropic", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/parallel-tool-use", desc: "Gọi nhiều tools cùng lúc để tăng hiệu suất" },
+      { title: "Anthropic Cookbook: Tool Use", type: "github", url: "https://github.com/anthropics/anthropic-cookbook/tree/main/tool_use", desc: "Ví dụ về error handling và advanced patterns" },
+    ]
+  },
+  {
+    id: 6, phase: 1,
+    title: "Memory — Short-term & Long-term",
+    subtopic: "In-context, external, retrieval",
+    difficulty: 2,
+    questions: [
+      "In-context memory khác external memory ở điểm nào?",
+      "Làm sao quản lý conversation history khi context window đầy?",
+      "File-based long-term memory hoạt động như thế nào?"
+    ],
+    topics: [
+      { label: "In-context vs external memory", type: "concept" },
+      { label: "Quản lý conversation history", type: "code" },
+      { label: "File-based long-term memory đơn giản", type: "code" },
+      { label: "Giới hạn context window — cách xử lý", type: "concept" },
+    ],
+    deliverable: "Agent nhớ thông tin giữa các session",
+    resources: [
+      { title: "LangChain: Memory Concepts", type: "docs", url: "https://python.langchain.com/docs/concepts/memory/", desc: "Các loại memory trong LangChain" },
+      { title: "LangChain: LCEL Guide", type: "docs", url: "https://python.langchain.com/docs/concepts/lcel/", desc: "LangChain Expression Language để build pipelines" },
+      { title: "Lilian Weng: Agent Memory section", type: "blog", url: "https://lilianweng.github.io/posts/2023-06-23-agent/", desc: "Phân loại và cơ chế memory trong agents" },
+    ]
+  },
+  {
+    id: 7, phase: 1,
+    title: "RAG — Retrieval-Augmented Generation",
+    subtopic: "Vector search, embedding, retrieval",
+    difficulty: 3,
+    questions: [
+      "Vector database và semantic search hoạt động thế nào?",
+      "Embedding là gì và tại sao cần nó?",
+      "Pipeline RAG end-to-end gồm những bước nào?"
+    ],
+    topics: [
+      { label: "Vector database và semantic search", type: "concept" },
+      { label: "Embedding và similarity search", type: "concept" },
+      { label: "RAG pipeline end-to-end", type: "code" },
+      { label: "Đánh giá chất lượng retrieval", type: "eval", isNew: true },
+    ],
+    deliverable: "Document Q&A agent với RAG trên file của bạn",
+    resources: [
+      { title: "LangChain RAG Tutorial", type: "docs", url: "https://python.langchain.com/docs/tutorials/rag/", desc: "Hướng dẫn từng bước xây dựng RAG pipeline" },
+      { title: "ChromaDB — Vector Database", type: "github", url: "https://github.com/chroma-core/chroma", desc: "Vector database nhẹ, dễ dùng cho local development" },
+      { title: "FAISS — Facebook AI Similarity Search", type: "github", url: "https://github.com/facebookresearch/faiss", desc: "Thư viện tìm kiếm similarity của Facebook" },
+      { title: "DeepLearning.AI: LangChain for LLM App Dev", type: "course", url: "https://www.deeplearning.ai/short-courses/langchain-for-llm-application-development/", desc: "Khóa học thực hành RAG với LangChain" },
+    ]
+  },
+  {
+    id: 8, phase: 1,
+    title: "LangGraph — State Machine cho Agent",
+    subtopic: "Graph, node, edge, checkpoint",
+    difficulty: 3,
+    questions: [
+      "Tại sao cần state machine thay vì vòng lặp đơn giản?",
+      "Graph, Node, Edge trong LangGraph là gì?",
+      "Checkpoint giúp gì cho agent production?"
+    ],
+    topics: [
+      { label: "Tại sao cần state machine thay vì simple loop", type: "concept" },
+      { label: "LangGraph: graph cơ bản, node, edge", type: "code" },
+      { label: "Checkpoint và persistence", type: "code" },
+      { label: "Migrate ReAct loop sang LangGraph", type: "code" },
+    ],
+    deliverable: "ReAct agent được rebuild bằng LangGraph",
+    resources: [
+      { title: "LangGraph Concepts", type: "docs", url: "https://langchain-ai.github.io/langgraph/concepts/", desc: "Hiểu graph, state, node, edge trong LangGraph" },
+      { title: "LangGraph GitHub", type: "github", url: "https://github.com/langchain-ai/langgraph", desc: "Source code và ví dụ LangGraph" },
+      { title: "DeepLearning.AI: AI Agents in LangGraph", type: "course", url: "https://www.deeplearning.ai/short-courses/ai-agents-in-langgraph/", desc: "Khóa học thực hành agents với LangGraph" },
+    ]
+  },
+  {
+    id: 9, phase: 1,
+    title: "Self-RAG & Adaptive Retrieval",
+    subtopic: "Khi nào cần retrieve, khi nào không",
+    difficulty: 3,
+    questions: [
+      "Self-RAG quyết định retrieve hay không như thế nào?",
+      "Query transformation cải thiện retrieval ra sao?",
+      "Đánh giá retrieval quality bằng metrics nào?"
+    ],
+    topics: [
+      { label: "Self-RAG — agent quyết định có cần retrieve không", type: "concept" },
+      { label: "Routing logic trong pipeline", type: "code" },
+      { label: "Query transformation để cải thiện retrieval", type: "code" },
+      { label: "Đánh giá retrieval quality với metrics", type: "eval" },
+    ],
+    deliverable: "Research Agent tích hợp Self-RAG vào LangGraph",
+    resources: [
+      { title: "Self-RAG Paper", type: "paper", url: "https://arxiv.org/abs/2310.11511", desc: "Paper gốc Self-RAG — agent tự quyết định khi nào cần retrieve" },
+      { title: "LangGraph: Agentic RAG Tutorial", type: "docs", url: "https://langchain-ai.github.io/langgraph/tutorials/rag/langgraph_agentic_rag/", desc: "Implement Self-RAG pattern với LangGraph" },
+      { title: "DeepLearning.AI: Building & Evaluating Advanced RAG", type: "course", url: "https://www.deeplearning.ai/short-courses/building-evaluating-advanced-rag/", desc: "Đánh giá và cải thiện RAG nâng cao" },
+    ]
+  },
+  {
+    id: 10, phase: 1,
+    title: "Hoàn thiện CLI Research Agent",
+    subtopic: "Polish, test, document",
+    difficulty: 2,
+    questions: [
+      "End-to-end testing cho agent bao gồm những gì?",
+      "Làm sao viết README tốt cho agent project?",
+      "Checklist để hoàn thiện Project 1?"
+    ],
+    topics: [
+      { label: "End-to-end testing cho agent", type: "eval" },
+      { label: "Comprehensive error handling", type: "code" },
+      { label: "CLI interface đẹp với rich/typer", type: "code" },
+      { label: "Viết README và document architecture", type: "concept" },
+    ],
+    deliverable: "Complete CLI Research Agent — Project 1 hoàn thành ✓",
+    resources: [
+      { title: "Rich — Python CLI Formatting", type: "github", url: "https://github.com/Textualize/rich", desc: "Thư viện tạo CLI interface đẹp" },
+      { title: "Typer — CLI Framework", type: "docs", url: "https://typer.tiangolo.com/", desc: "Build CLI apps với Python type hints" },
+      { title: "LangGraph How-To Guides", type: "docs", url: "https://langchain-ai.github.io/langgraph/how-tos/", desc: "Tham khảo khi hoàn thiện và test agent" },
+    ]
+  },
+  {
+    id: 11, phase: 2,
+    title: "Multi-Agent Architecture",
+    subtopic: "Orchestrator, worker, patterns",
+    difficulty: 2,
+    questions: [
+      "Khi nào nên tách thành nhiều agents thay vì 1 agent?",
+      "Orchestrator vs Worker pattern khác nhau thế nào?",
+      "Agents giao tiếp với nhau qua cơ chế nào?"
+    ],
+    topics: [
+      { label: "Khi nào nên chia thành nhiều agents", type: "concept" },
+      { label: "Orchestrator vs worker agent pattern", type: "concept" },
+      { label: "Giao tiếp giữa các agents", type: "concept" },
+      { label: "Thiết kế kiến trúc Content Pipeline", type: "concept" },
+    ],
+    deliverable: "Architecture diagram + định nghĩa vai trò các agents trong Content Pipeline",
+    resources: [
+      { title: "Anthropic: Building Effective Agents", type: "blog", url: "https://www.anthropic.com/research/building-effective-agents", desc: "Hướng dẫn chính thức từ Anthropic về multi-agent patterns" },
+      { title: "Anthropic: Agents Guide", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/agents", desc: "Tài liệu về cách build agents với Claude" },
+    ]
+  },
+  {
+    id: 12, phase: 2,
+    title: "Build Orchestrator Agent",
+    subtopic: "Task delegation, result aggregation",
+    difficulty: 3,
+    questions: [
+      "Orchestrator nhận và phân tích task như thế nào?",
+      "Kết quả từ worker agents được aggregate ra sao?",
+      "Làm sao trace luồng chạy của multi-agent?"
+    ],
+    topics: [
+      { label: "Orchestrator nhận và phân rã task", type: "code" },
+      { label: "Delegate sang worker agents", type: "code" },
+      { label: "Aggregate và validate kết quả từ workers", type: "code" },
+      { label: "Trace multi-agent flow lần đầu", type: "eval", isNew: true },
+    ],
+    deliverable: "Orchestrator agent điều phối 2 worker agents",
+    resources: [
+      { title: "LangGraph: Multi-Agent Supervisor", type: "docs", url: "https://langchain-ai.github.io/langgraph/tutorials/multi_agent/agent_supervisor/", desc: "Tutorial build supervisor orchestrator với LangGraph" },
+      { title: "LangGraph: Multi-Agent Concepts", type: "docs", url: "https://langchain-ai.github.io/langgraph/concepts/multi_agent/", desc: "Khái niệm multi-agent trong LangGraph" },
+    ]
+  },
+  {
+    id: 13, phase: 2,
+    title: "Specialized Worker Agents",
+    subtopic: "Research, Writer, Editor agents",
+    difficulty: 3,
+    questions: [
+      "System prompt cho từng role agent nên thiết kế thế nào?",
+      "Research Worker tổng hợp web search ra sao?",
+      "Editor Agent review và feedback như thế nào?"
+    ],
+    topics: [
+      { label: "Thiết kế system prompt cho từng role agent", type: "concept" },
+      { label: "Research Worker — web search + synthesis", type: "code" },
+      { label: "Writer Agent — structured content generation", type: "code" },
+      { label: "Editor Agent — review và feedback", type: "code" },
+    ],
+    deliverable: "3 specialized agents hoạt động độc lập",
+    resources: [
+      { title: "LangGraph: Multi-Agent Collaboration", type: "docs", url: "https://langchain-ai.github.io/langgraph/tutorials/multi_agent/multi-agent-collaboration/", desc: "Tutorial về multi-agent collaboration patterns" },
+      { title: "Anthropic: Building Effective Agents", type: "blog", url: "https://www.anthropic.com/research/building-effective-agents", desc: "Nguyên tắc thiết kế system prompt cho agents" },
+    ]
+  },
+  {
+    id: 14, phase: 2,
+    title: "CrewAI & AutoGen",
+    subtopic: "So sánh framework trong thực tế",
+    difficulty: 3,
+    questions: [
+      "CrewAI tiếp cận multi-agent như thế nào?",
+      "AutoGen khác CrewAI ở điểm nào?",
+      "Khi nào dùng framework thay vì tự build?"
+    ],
+    topics: [
+      { label: "CrewAI — role-based agent collaboration", type: "code" },
+      { label: "AutoGen — conversation-driven multi-agent", type: "code" },
+      { label: "So sánh với giải pháp tự build từ tuần 12-13", type: "concept" },
+      { label: "Khi nào dùng framework vs tự build", type: "concept" },
+    ],
+    deliverable: "Rebuild 1 phần Content Pipeline với CrewAI, so sánh kết quả",
+    resources: [
+      { title: "CrewAI Documentation", type: "docs", url: "https://docs.crewai.com/", desc: "Tài liệu chính thức CrewAI" },
+      { title: "CrewAI GitHub", type: "github", url: "https://github.com/crewAIInc/crewAI", desc: "Source code và ví dụ CrewAI" },
+      { title: "AutoGen GitHub", type: "github", url: "https://github.com/microsoft/autogen", desc: "Microsoft AutoGen — conversation-driven agents" },
+      { title: "DeepLearning.AI: Multi AI Agent Systems with crewAI", type: "course", url: "https://www.deeplearning.ai/short-courses/multi-ai-agent-systems-with-crewai/", desc: "Khóa học thực hành CrewAI" },
+      { title: "DeepLearning.AI: AI Agentic Design Patterns with AutoGen", type: "course", url: "https://www.deeplearning.ai/short-courses/ai-agentic-design-patterns-with-autogen/", desc: "Khóa học thực hành AutoGen" },
+    ]
+  },
+  {
+    id: 15, phase: 2,
+    title: "Shared Memory & Agent Context",
+    subtopic: "Memory architecture cho multi-agent",
+    difficulty: 3,
+    questions: [
+      "Shared state giữa các agents hoạt động thế nào?",
+      "Làm sao tránh conflict khi nhiều agents cùng ghi state?",
+      "Memory compression giúp gì khi context đầy?"
+    ],
+    topics: [
+      { label: "Shared state giữa các agents", type: "concept" },
+      { label: "Episodic memory — lưu kết quả theo task", type: "code" },
+      { label: "Tránh conflict khi nhiều agents ghi state", type: "code" },
+      { label: "Memory compression để tiết kiệm context", type: "code" },
+    ],
+    deliverable: "Content Pipeline với shared memory hoạt động nhất quán",
+    resources: [
+      { title: "Mem0 — Memory for AI Applications", type: "github", url: "https://github.com/mem0ai/mem0", desc: "Thư viện memory cho AI agents" },
+      { title: "Mem0 Documentation", type: "docs", url: "https://docs.mem0.ai/overview", desc: "Hướng dẫn sử dụng Mem0" },
+      { title: "LangGraph: Memory", type: "docs", url: "https://langchain-ai.github.io/langgraph/concepts/memory/", desc: "Memory trong LangGraph multi-agent" },
+    ]
+  },
+  {
+    id: 16, phase: 2,
+    title: "Evaluation cho Multi-Agent",
+    subtopic: "Trajectory, outcome, agent-level metrics",
+    difficulty: 3,
+    questions: [
+      "Trajectory evaluation vs outcome evaluation khác gì?",
+      "LLM-as-judge hoạt động như thế nào?",
+      "Eval harness cho Content Pipeline cần gì?"
+    ],
+    topics: [
+      { label: "Trajectory evaluation vs outcome evaluation", type: "eval" },
+      { label: "Đánh giá từng agent vs toàn bộ pipeline", type: "eval" },
+      { label: "LLM-as-judge cho content quality", type: "eval" },
+      { label: "Build eval harness cho Content Pipeline", type: "code" },
+    ],
+    deliverable: "Eval suite với 15+ test cases cho Content Pipeline",
+    resources: [
+      { title: "LangChain: Memory Concepts", type: "docs", url: "https://python.langchain.com/docs/concepts/memory/", desc: "Hiểu memory trong context của evaluation" },
+      { title: "LangGraph How-To Guides", type: "docs", url: "https://langchain-ai.github.io/langgraph/how-tos/", desc: "Hướng dẫn testing và debugging agent" },
+    ]
+  },
+  {
+    id: 17, phase: 2,
+    title: "Hoàn thiện Content Pipeline",
+    subtopic: "Polish, integrate, document",
+    difficulty: 2,
+    questions: [
+      "End-to-end integration test bao gồm những gì?",
+      "Performance benchmark giữa các agents đo thế nào?",
+      "Checklist để hoàn thiện Project 2?"
+    ],
+    topics: [
+      { label: "End-to-end integration test", type: "eval" },
+      { label: "Xử lý edge cases và failure modes", type: "code" },
+      { label: "Performance benchmark giữa các agents", type: "eval" },
+      { label: "Document design decisions", type: "concept" },
+    ],
+    deliverable: "Complete Multi-Agent Content Pipeline — Project 2 hoàn thành ✓",
+    resources: [
+      { title: "Anthropic: Building Effective Agents (đọc lại)", type: "blog", url: "https://www.anthropic.com/research/building-effective-agents", desc: "Đọc lại toàn bộ sau khi đã có kinh nghiệm" },
+      { title: "LangGraph How-To Guides", type: "docs", url: "https://langchain-ai.github.io/langgraph/how-tos/", desc: "Tham khảo khi hoàn thiện pipeline" },
+    ]
+  },
+  {
+    id: 18, phase: 3,
+    title: "Observability & Tracing",
+    subtopic: "LangSmith, logging, metrics",
+    difficulty: 3,
+    questions: [
+      "Tại sao observability là bắt buộc với production agent?",
+      "LangSmith trace pipeline như thế nào?",
+      "Metrics nào cần theo dõi: cost, latency, success rate?"
+    ],
+    topics: [
+      { label: "Tại sao observability là bắt buộc", type: "concept" },
+      { label: "LangSmith setup và trace toàn bộ pipeline", type: "code" },
+      { label: "Custom metrics: cost/run, latency/run, success rate", type: "code" },
+      { label: "Dashboard để monitor agent behavior", type: "code" },
+    ],
+    deliverable: "LangSmith tracing + metrics dashboard cho Research Agent",
+    resources: [
+      { title: "LangSmith Documentation", type: "docs", url: "https://docs.smith.langchain.com/", desc: "Hướng dẫn đầy đủ về LangSmith observability" },
+      { title: "LangSmith SDK GitHub", type: "github", url: "https://github.com/langchain-ai/langsmith-sdk", desc: "SDK để tích hợp LangSmith vào agent" },
+      { title: "LangSmith: Evaluation Guide", type: "docs", url: "https://docs.smith.langchain.com/evaluation", desc: "Đánh giá agent với LangSmith" },
+    ]
+  },
+  {
+    id: 19, phase: 3,
+    title: "Safety & Guardrails",
+    subtopic: "Failure modes, input/output validation",
+    difficulty: 3,
+    questions: [
+      "Failure modes của agent là gì: loops, hallucination, tool misuse?",
+      "Prompt injection attack hoạt động thế nào?",
+      "Input/output validation layer cần bao gồm gì?"
+    ],
+    topics: [
+      { label: "Failure modes: loops, hallucination, tool misuse", type: "eval" },
+      { label: "Prompt injection và adversarial inputs", type: "eval" },
+      { label: "Input/output validation layer", type: "code" },
+      { label: "Threat modeling cho agent của bạn", type: "eval" },
+    ],
+    deliverable: "Guardrail layer + 2 mitigations cụ thể cho project",
+    resources: [
+      { title: "OWASP LLM Top 10", type: "docs", url: "https://owasp.org/www-project-top-10-for-large-language-model-applications/", desc: "10 lỗ hổng bảo mật phổ biến nhất của LLM applications" },
+      { title: "NeMo Guardrails — NVIDIA", type: "github", url: "https://github.com/NVIDIA/NeMo-Guardrails", desc: "Framework guardrails cho LLM apps từ NVIDIA" },
+      { title: "Guardrails AI", type: "docs", url: "https://docs.guardrailsai.com/", desc: "Tài liệu Guardrails AI library" },
+    ]
+  },
+  {
+    id: 20, phase: 3,
+    title: "Human-in-the-Loop",
+    subtopic: "Approval flow, interrupt, undo",
+    difficulty: 3,
+    questions: [
+      "Risk classification: low/medium/high được định nghĩa thế nào?",
+      "LangGraph interrupt pattern hoạt động ra sao?",
+      "Undo mechanism cho reversible actions cài đặt thế nào?"
+    ],
+    topics: [
+      { label: "Risk classification: low / medium / high", type: "concept" },
+      { label: "LangGraph interrupt pattern", type: "code" },
+      { label: "Human approval UX — đủ context, thời gian ngắn", type: "concept" },
+      { label: "Undo mechanism cho reversible actions", type: "code" },
+    ],
+    deliverable: "Approval step trong Content Pipeline với LangGraph checkpoint",
+    resources: [
+      { title: "LangGraph: Human-in-the-Loop", type: "docs", url: "https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/", desc: "Khái niệm và patterns HITL trong LangGraph" },
+      { title: "LangGraph: Breakpoints", type: "docs", url: "https://langchain-ai.github.io/langgraph/how-tos/human_in_the_loop/breakpoints/", desc: "Implement breakpoints để pause và resume agent" },
+      { title: "Pydantic Documentation", type: "docs", url: "https://docs.pydantic.dev/latest/", desc: "Validate input/output với Pydantic models" },
+    ]
+  },
+  {
+    id: 21, phase: 3,
+    title: "Structured Output & Reliability",
+    subtopic: "Pydantic, retry, circuit breaker",
+    difficulty: 3,
+    questions: [
+      "Pydantic models giúp gì cho agent reliability?",
+      "Retry với exponential backoff implement thế nào?",
+      "Circuit breaker pattern là gì và khi nào dùng?"
+    ],
+    topics: [
+      { label: "Structured output với Pydantic models", type: "code" },
+      { label: "Retry với exponential backoff", type: "code" },
+      { label: "Circuit breaker pattern", type: "code" },
+      { label: "Graceful degradation khi tools fail", type: "code" },
+    ],
+    deliverable: "Migrate tất cả agent interfaces sang Pydantic structured output",
+    resources: [
+      { title: "Pydantic Documentation", type: "docs", url: "https://docs.pydantic.dev/latest/", desc: "Tài liệu đầy đủ Pydantic v2" },
+      { title: "Pydantic GitHub", type: "github", url: "https://github.com/pydantic/pydantic", desc: "Source code và ví dụ Pydantic" },
+      { title: "Anthropic: Structured Outputs", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs", desc: "Structured output với Claude API" },
+      { title: "LangGraph: Human-in-the-Loop", type: "docs", url: "https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/", desc: "Kết hợp HITL và structured output" },
+    ]
+  },
+  {
+    id: 22, phase: 3,
+    title: "Advanced Techniques",
+    subtopic: "Self-reflection, tool selection optimization",
+    difficulty: 3,
+    questions: [
+      "Self-reflection nên dùng khi nào, không nên khi nào?",
+      "Tool routing layer giúp cải thiện accuracy thế nào?",
+      "Few-shot examples cho tool selection hoạt động thế nào?"
+    ],
+    topics: [
+      { label: "Self-reflection — khi nào dùng và không dùng", type: "concept" },
+      { label: "Tool routing layer — expose đúng tools", type: "code" },
+      { label: "Few-shot examples cho tool selection", type: "code" },
+      { label: "Reflexion paper — đọc và implement", type: "code" },
+    ],
+    deliverable: "Content Pipeline với structured output + self-reflection cho Editor",
+    resources: [
+      { title: "Reflexion Paper (đọc lại kỹ)", type: "paper", url: "https://arxiv.org/abs/2303.11366", desc: "Implement Reflexion đầy đủ sau khi có nền tảng" },
+      { title: "Anthropic: Structured Outputs", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs", desc: "Kết hợp tool routing với structured output" },
+    ]
+  },
+  {
+    id: 23, phase: 3,
+    title: "Cost, Latency & Optimization",
+    subtopic: "Model routing, caching, parallel",
+    difficulty: 4,
+    questions: [
+      "Model routing: khi nào dùng Haiku vs Sonnet vs Opus?",
+      "Prompt caching hoạt động thế nào và tiết kiệm bao nhiêu?",
+      "Làm sao đo và optimize cost/latency mà không giảm quality?"
+    ],
+    topics: [
+      { label: "Model routing — task đơn giản → Haiku, phức tạp → Sonnet", type: "concept" },
+      { label: "Prompt caching cho system prompts dài", type: "code" },
+      { label: "Parallel execution cho independent calls", type: "code" },
+      { label: "Profile và benchmark — đo trước khi optimize", type: "eval" },
+    ],
+    deliverable: "Giảm 30% cost hoặc latency mà không giảm quality score",
+    resources: [
+      { title: "Anthropic: Prompt Caching", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching", desc: "Giảm cost với prompt caching" },
+      { title: "Anthropic: Model Overview & Comparison", type: "docs", url: "https://docs.anthropic.com/en/docs/about-claude/models/overview", desc: "So sánh Haiku, Sonnet, Opus để model routing" },
+      { title: "LangChain: Streaming", type: "docs", url: "https://python.langchain.com/docs/concepts/streaming/", desc: "Streaming để cải thiện perceived latency" },
+    ]
+  },
+  {
+    id: 24, phase: 3,
+    title: "Production Deployment — Capstone",
+    subtopic: "Observability, safety, quality, reliability",
+    difficulty: 4,
+    questions: [
+      "Production-ready checklist đầy đủ gồm những gì?",
+      "Automated evaluation pipeline cần gì?",
+      "Rate limiting và error alerting setup thế nào?"
+    ],
+    topics: [
+      { label: "Production-ready checklist đầy đủ", type: "concept" },
+      { label: "Automated evaluation pipeline", type: "eval" },
+      { label: "Rate limiting, error alerting", type: "code" },
+      { label: "README + design decisions document", type: "concept" },
+    ],
+    deliverable: "Production-grade agent system — Portfolio Project 3 hoàn thành ✓",
+    resources: [
+      { title: "Anthropic: Building Effective Agents (final re-read)", type: "blog", url: "https://www.anthropic.com/research/building-effective-agents", desc: "Đọc lại lần cuối với toàn bộ kiến thức đã có" },
+      { title: "LangSmith Full Documentation", type: "docs", url: "https://docs.smith.langchain.com/", desc: "Hoàn thiện observability và monitoring" },
+      { title: "Anthropic Cookbook: Production Examples", type: "github", url: "https://github.com/anthropics/anthropic-cookbook", desc: "Ví dụ production-grade từ Anthropic" },
+      { title: "Anthropic: Production Agents Guide", type: "docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/agents", desc: "Best practices cho production agents" },
+    ]
+  }
+];
+
+// =============================================
+// DAYS DATA (120 days, 5 days per week)
+// =============================================
+const DAYS = [
+  // Week 1
+  { id: 1, weekId: 1, title: "AI Agent là gì?", concept: "Agent = LLM + Memory + Tools + Planning. Khác chatbot: agent tự chọn hành động tiếp theo.", reading: "Anthropic: What are AI agents? | Lilian Weng: LLM-powered Autonomous Agents (intro)", build: "Setup môi trường: Python 3.11+, venv, anthropic SDK. Hello World với Claude API.", output: "Script gọi Claude API thành công, in ra response." },
+  { id: 2, weekId: 1, title: "4 Thành Phần Cốt Lõi", concept: "LLM (brain) + Memory (context) + Tools (actions) + Planning (strategy). Mỗi thành phần giải quyết vấn đề gì.", reading: "Lilian Weng: Agent Components section | Anthropic Docs: Overview", build: "Phác thảo kiến trúc agent trên giấy/Excalidraw. Viết pseudocode cho research agent.", output: "Architecture diagram + pseudocode cho CLI Research Agent." },
+  { id: 3, weekId: 1, title: "System Prompt + Conversation History", concept: "System prompt định hình behavior. Conversation history = short-term memory. Token budget.", reading: "Anthropic: System Prompts | Anthropic: Messages API", build: "Viết system prompt cho research agent. Build conversation loop đơn giản.", output: "Multi-turn conversation loop hoạt động, nhớ context trong session." },
+  { id: 4, weekId: 1, title: "Anthropic Docs + Token Cost", concept: "Đọc toàn bộ Anthropic Quickstart. Hiểu token pricing: input vs output vs cache.", reading: "Anthropic: Quickstart | Anthropic: Token Counting | Anthropic: Model Overview", build: "Thêm token counting vào conversation loop. Tính cost mỗi request.", output: "Log hiển thị token usage và estimated cost sau mỗi message." },
+  { id: 5, weekId: 1, title: "Review Tuần 1 + Commit", concept: "Tổng hợp: agent khác chatbot thế nào, 4 thành phần, system prompt tốt.", reading: "Đọc lại notes của 4 ngày trước", build: "Clean code, thêm comments, push lên GitHub. Viết README.", output: "GitHub repo với README mô tả project + code sạch." },
+  // Week 2
+  { id: 6, weekId: 2, title: "ReAct là gì + Đọc Paper", concept: "ReAct = Reasoning + Acting. Loop: Think → Act → Observe → Think... Tại sao hiệu quả hơn chain-of-thought đơn thuần.", reading: "ReAct Paper (arxiv.org/abs/2210.03629) — đọc Abstract + Section 2 + Figure 1", build: "Vẽ sơ đồ ReAct loop. Viết ví dụ manual: nếu task là 'tìm dân số VN 2024', trace qua loop.", output: "Sơ đồ + ví dụ trace thủ công cho 1 task cụ thể." },
+  { id: 7, weekId: 2, title: "Viết ReAct System Prompt", concept: "System prompt phải hướng dẫn model: khi nào dùng tool, format Thought/Action/Observation.", reading: "Anthropic: Prompt Engineering | Anthropic: Tool Use Overview", build: "Viết system prompt cho ReAct agent. Test với Claude, xem model có follow format không.", output: "System prompt khiến Claude output đúng Thought/Action/Observation format." },
+  { id: 8, weekId: 2, title: "Implement ReAct Loop Skeleton", concept: "Vòng lặp: gửi message → parse output → nếu có Action → execute tool → thêm Observation → lặp lại.", reading: "Anthropic: Tool Use | LangChain: ReAct concept (tham khảo)", build: "Code ReAct loop: parse Thought/Action/Observation từ model output. Chưa cần tool thật.", output: "Loop chạy được với mock tool (luôn return 'Tool called')." },
+  { id: 9, weekId: 2, title: "Thêm Tool + Chạy ReAct", concept: "Tool = function Python được wrapped. Tool description quan trọng hơn implementation.", reading: "Anthropic: Tool Use Best Practices", build: "Add tool thật: calculator (eval biểu thức), current_date. Chạy ReAct agent với task thật.", output: "Agent giải được bài toán cần calculator tool qua 2-3 bước." },
+  { id: 10, weekId: 2, title: "Review + Debug + Ghi Log", concept: "Debugging agent: log mọi bước, đọc trace. Common bugs: infinite loop, wrong format parse.", reading: "Xem lại code ngày 8-9, tìm edge cases", build: "Thêm logging chi tiết. Test với 5 queries khác nhau. Fix bugs phát sinh.", output: "Log rõ ràng, agent handle được 5/5 test queries." },
+  // Week 3
+  { id: 11, weekId: 3, title: "Plan-and-Execute, Tree of Thought, Reflexion", concept: "Plan-and-Execute: tách planning khỏi execution. ToT: explore nhiều paths. Reflexion: học từ lỗi.", reading: "Reflexion Paper (arxiv.org/abs/2303.11366) — Abstract + Section 3 | Tree of Thoughts Paper — Abstract", build: "So sánh 3 patterns: vẽ diagram cho mỗi cái, liệt kê ưu/nhược điểm.", output: "Bảng so sánh 3 planning strategies với use case phù hợp." },
+  { id: 12, weekId: 3, title: "Implement Reflexion", concept: "Reflexion loop: Try → Evaluate → Reflect → Retry. Reflection prompt quan trọng.", reading: "Reflexion Paper: Section 4 (implementation) | Lilian Weng: Reflexion section", build: "Implement Reflexion wrapper cho ReAct agent: sau khi fail, agent tự reflect và thử lại.", output: "Agent retry với reflection sau failure, cải thiện output lần 2." },
+  { id: 13, weekId: 3, title: "Test Reflexion + So Sánh", concept: "Đánh giá: Reflexion có thực sự giúp không? Khi nào có, khi nào không?", reading: "Xem lại implementation hôm qua", build: "Test 10 tasks: 5 tasks Reflexion giúp, 5 tasks không. Ghi lại kết quả.", output: "Bảng kết quả với nhận xét: Reflexion phù hợp với loại task nào." },
+  { id: 14, weekId: 3, title: "Hoàn Thiện Week 3 Project", concept: "Polish: error handling, clean code, viết test.", reading: "Python: unittest hoặc pytest basics", build: "Thêm proper error handling cho Reflexion loop. Viết 3 unit tests.", output: "Code có error handling + 3 tests pass." },
+  { id: 15, weekId: 3, title: "Review Tuần 3 + Commit", concept: "Tổng hợp planning strategies. Quyết định dùng strategy nào cho Research Agent cuối.", reading: "Đọc lại notes tuần 1-3", build: "Commit code, update README với section về planning strategy đã chọn.", output: "GitHub commit + README updated." },
+  // Week 4
+  { id: 16, weekId: 4, title: "Cơ Chế Function Calling", concept: "Function calling: model output JSON schema → code parse và execute → trả kết quả. Khác text parsing.", reading: "Anthropic: Tool Use | Anthropic: Tool Use Examples", build: "Refactor ReAct agent sang dùng Anthropic function calling thay vì text parsing.", output: "Agent dùng native function calling, bỏ regex parsing." },
+  { id: 17, weekId: 4, title: "Tool Description: Tốt vs Xấu", concept: "Tool description = prompt cho model. Mô tả rõ: khi nào dùng, parameter là gì, return gì.", reading: "Anthropic: Tool Use Best Practices — Tool descriptions section", build: "Viết 3 tool descriptions: 1 tệ, 1 trung bình, 1 tốt. Test xem model call đúng không.", output: "3 versions + test results cho thấy tác động của description quality." },
+  { id: 18, weekId: 4, title: "Build web_search Tool", concept: "Real tool integration: API key, error handling, rate limiting, response parsing.", reading: "Tavily API docs hoặc SerpAPI docs", build: "Implement web_search tool với Tavily/SerpAPI. Handle rate limit, timeout, parse results.", output: "web_search tool hoạt động, trả về top 3 results với title + snippet." },
+  { id: 19, weekId: 4, title: "Build calculate + save_note Tools", concept: "Tool suite: calculator an toàn hơn eval(). save_note = file I/O tool.", reading: "Python: ast.literal_eval | Python: pathlib", build: "Implement calculate tool (safe eval) + save_note tool (write to file). Test edge cases.", output: "2 tools hoạt động với error handling tốt." },
+  { id: 20, weekId: 4, title: "Tool Schema Xấu vs Tốt: Thực Nghiệm", concept: "Experiment: schema quality ảnh hưởng thế nào đến tool calling accuracy.", reading: "Anthropic: Tool Use — Schema design", build: "Test 5 schema variations cho web_search. Đo accuracy của model khi call tool.", output: "Report: schema design tốt nhất + lý do tại sao." },
+  // Week 5
+  { id: 21, weekId: 5, title: "Review Tuần 4 + Commit", concept: "Tổng hợp: function calling, tool design, schema. Checklist tool quality.", reading: "Đọc lại code tuần 4", build: "Clean code, commit. Viết tool design checklist vào README.", output: "GitHub commit + tool design checklist." },
+  { id: 22, weekId: 5, title: "Sequential vs Parallel Tool Calls", concept: "Sequential: an toàn, dễ debug. Parallel: nhanh hơn 3-5x nhưng cần independent tools.", reading: "Anthropic: Tool Use — Parallel tool calls section", build: "Benchmark: sequential vs parallel cho 3 web_search calls. Đo thời gian.", output: "Benchmark results + code parallel search." },
+  { id: 23, weekId: 5, title: "Implement Parallel Search", concept: "asyncio.gather() để chạy multiple tool calls song song. Handle partial failures.", reading: "Python: asyncio | Python: concurrent.futures", build: "Refactor agent để chạy independent web searches song song với asyncio.", output: "Agent chạy 3 searches song song, nhanh hơn 2-3x." },
+  { id: 24, weekId: 5, title: "Retry Logic + Exponential Backoff", concept: "Transient failures: timeout, rate limit, network error. Exponential backoff: 1s, 2s, 4s, 8s...", reading: "Tenacity library docs | AWS: Exponential Backoff pattern", build: "Implement retry decorator với exponential backoff cho tất cả tool calls.", output: "Tool calls tự retry khi fail, với proper backoff." },
+  { id: 25, weekId: 5, title: "Benchmark + Review Tuần 5", concept: "Đo performance: latency, success rate, cost trước và sau optimization.", reading: "Python: time, statistics modules", build: "Chạy benchmark 20 queries: đo avg latency, success rate, cost. So sánh với tuần 2.", output: "Benchmark report: trước vs sau parallel + retry." },
+  // Week 6
+  { id: 26, weekId: 6, title: "Tại Sao LangChain + LCEL", concept: "LangChain giải quyết boilerplate. LCEL = pipe operator để compose chains. Trade-offs.", reading: "LangChain: Why LangChain | LangChain: LCEL Introduction", build: "Install langchain, langchain-anthropic. Viết simple chain với LCEL pipe.", output: "LCEL chain: prompt | model | output_parser hoạt động." },
+  { id: 27, weekId: 6, title: "ChatModel + PromptTemplate + OutputParser", concept: "3 blocks cơ bản của LangChain. PromptTemplate = reusable. OutputParser = parse model output.", reading: "LangChain: ChatModels | LangChain: Prompt Templates | LangChain: Output Parsers", build: "Build chain: PromptTemplate | ChatAnthropic | StrOutputParser. Test với 5 inputs.", output: "Chain tái sử dụng được, parse output đúng format." },
+  { id: 28, weekId: 6, title: "AgentExecutor + Tools trong LangChain", concept: "AgentExecutor manages ReAct loop. Tools = LangChain Tool objects. create_react_agent.", reading: "LangChain: Agents | LangChain: AgentExecutor", build: "Rebuild ReAct agent từ tuần 2 bằng LangChain AgentExecutor + tools.", output: "LangChain ReAct agent hoạt động tương đương bản tự build." },
+  { id: 29, weekId: 6, title: "ConversationMemory trong LangChain", concept: "ConversationBufferMemory, ConversationSummaryMemory. Khi nào dùng loại nào.", reading: "LangChain: Memory | LangChain: Conversation Memory", build: "Thêm memory vào agent: test multi-turn conversation với context nhớ qua 5+ turns.", output: "Agent nhớ context qua 5 turns không bị quên." },
+  { id: 30, weekId: 6, title: "So Sánh: Raw Loop vs LangChain + Commit", concept: "LangChain: ít code hơn, nhiều abstraction. Raw loop: hiểu rõ hơn, flexible hơn.", reading: "Đọc lại code tuần 2 (raw) và tuần 6 (LangChain)", build: "Viết bảng so sánh chi tiết. Commit cả 2 versions.", output: "Bảng so sánh + GitHub commit với 2 implementations." },
+  // Week 7
+  { id: 31, weekId: 7, title: "Tại Sao LangGraph? Giới Hạn của AgentExecutor", concept: "AgentExecutor: không control flow, không branches, không human-in-the-loop. LangGraph giải quyết.", reading: "LangGraph: Why LangGraph | LangGraph: Concepts Overview", build: "List 3 limitations của AgentExecutor bạn đã gặp. Map sang LangGraph solutions.", output: "Doc: 3 limitations + cách LangGraph giải quyết mỗi cái." },
+  { id: 32, weekId: 7, title: "LangGraph: State, Node, Edge", concept: "State = TypedDict. Node = function(state) → state update. Edge = điều kiện chuyển node.", reading: "LangGraph: State | LangGraph: Nodes | LangGraph: Edges", build: "Build graph đơn giản: 2 nodes, 1 conditional edge. Visualize graph.", output: "LangGraph graph chạy được, visualize thành công." },
+  { id: 33, weekId: 7, title: "LangGraph: ToolNode & tools_condition", concept: "ToolNode tự động execute tools. tools_condition route: có tool call → ToolNode, không → END.", reading: "LangGraph: ToolNode | LangGraph: How-To: Tool Calling", build: "Rebuild ReAct agent bằng LangGraph với ToolNode và tools_condition.", output: "LangGraph ReAct agent hoạt động, bỏ manual tool execution." },
+  { id: 34, weekId: 7, title: "LangGraph: Checkpointer & Multi-turn Memory", concept: "Checkpointer lưu state sau mỗi node. Thread ID = session. Multi-turn = resume từ checkpoint.", reading: "LangGraph: Persistence | LangGraph: Memory", build: "Thêm MemorySaver checkpointer. Test: tắt-bật program, agent vẫn nhớ conversation.", output: "Agent nhớ context qua multiple program restarts." },
+  { id: 35, weekId: 7, title: "Research Agent v4: LangGraph Full", concept: "Tổng hợp: State + Node + Edge + ToolNode + Checkpointer = full agent.", reading: "LangGraph: Tutorials — Build a Basic Chatbot", build: "Rebuild Research Agent hoàn chỉnh bằng LangGraph. Test 10 queries.", output: "Research Agent v4 với LangGraph, pass 10 test queries." },
+  // Week 8
+  { id: 36, weekId: 8, title: "Review Tuần 7 LangGraph", concept: "Tổng hợp LangGraph: khi nào dùng graph vs chain. Checklist agent quality.", reading: "Đọc lại LangGraph code + notes", build: "Code review: refactor 2 đoạn code xấu nhất. Update README LangGraph section.", output: "Refactored code + updated README." },
+  { id: 37, weekId: 8, title: "RAG: Tổng Quan Pipeline", concept: "RAG pipeline: Load → Chunk → Embed → Store → Retrieve → Generate. Tại sao cần RAG.", reading: "LangChain: RAG Tutorial — Overview | Lilian Weng: RAG section", build: "Vẽ RAG pipeline diagram. Cài đặt: chromadb, langchain-community.", output: "RAG pipeline diagram + môi trường setup xong." },
+  { id: 38, weekId: 8, title: "RAG: Embeddings & ChromaDB", concept: "Embedding = vector representation. Cosine similarity. ChromaDB = local vector store.", reading: "ChromaDB: Getting Started | Anthropic: Embeddings concept", build: "Tạo ChromaDB collection. Embed 10 documents thủ công. Query với similarity search.", output: "ChromaDB hoạt động, similarity search trả kết quả đúng." },
+  { id: 39, weekId: 8, title: "RAG: Document Loading & Chunking", concept: "Loader: PDF, web, text. Chunking strategies: fixed-size, sentence, semantic. Overlap.", reading: "LangChain: Document Loaders | LangChain: Text Splitters", build: "Load 1 PDF + 1 web page. Thử 3 chunking strategies. So sánh chunk quality.", output: "3 chunking strategies tested, chọn được strategy tốt nhất." },
+  { id: 40, weekId: 8, title: "RAG: Full Query Pipeline", concept: "End-to-end: query → embed → retrieve top-k → inject vào prompt → generate.", reading: "LangChain: RAG Tutorial — Full pipeline", build: "Build full RAG pipeline: load docs → chunk → embed → store → query → answer.", output: "RAG pipeline trả lời được 5 câu hỏi về document." },
+  // Week 9
+  { id: 41, weekId: 9, title: "Review Tuần 8 RAG + Test 10 Câu Hỏi", concept: "Đánh giá RAG baseline: precision, recall, answer quality.", reading: "Đọc lại RAG code tuần 8", build: "Test RAG pipeline với 10 câu hỏi. Ghi lại: đúng/sai, tại sao sai.", output: "Test report: 10 questions, accuracy %, error analysis." },
+  { id: 42, weekId: 9, title: "Chunking Strategies So Sánh", concept: "Fixed-size chunks: đơn giản nhưng cắt giữa câu. Sentence chunks: semantic nhưng size vary. Semantic chunking: tốt nhất nhưng chậm.", reading: "LangChain: Text Splitters comparison | Greg Kamradt: Chunking strategies", build: "Implement và benchmark 3 strategies trên cùng corpus. Đo retrieval accuracy.", output: "Benchmark: 3 strategies vs accuracy, chọn winner." },
+  { id: 43, weekId: 9, title: "Reranking với Cross-Encoder", concept: "Bi-encoder retrieve nhanh nhưng kém chính xác. Cross-encoder rerank chậm nhưng accurate hơn.", reading: "SBERT: Cross-Encoders | Cohere Rerank API docs", build: "Thêm reranking bước sau retrieval. So sánh top-k trước và sau rerank.", output: "Reranking cải thiện precision từ X% lên Y%." },
+  { id: 44, weekId: 9, title: "Query Transformation", concept: "HyDE: generate hypothetical answer rồi embed. Multi-query: generate 3 queries khác nhau. Step-back prompting.", reading: "HyDE Paper — Abstract | LangChain: MultiQueryRetriever", build: "Implement HyDE + MultiQuery retriever. Test với ambiguous queries.", output: "Query transformation cải thiện retrieval cho 3 test cases." },
+  { id: 45, weekId: 9, title: "Kết Hợp: Sửa 5 Câu Sai từ Tuần 8", concept: "Apply improvements: chunking + reranking + query transformation để fix errors từ baseline.", reading: "Xem lại test report tuần 8", build: "Apply best techniques, re-test 5 câu sai từ tuần 8. Đo improvement.", output: "5 câu sai → ít nhất 4 câu đúng sau improvements." },
+  // Week 10
+  { id: 46, weekId: 10, title: "Review Tuần 9 + Bảng So Sánh RAG", concept: "Tổng hợp RAG techniques. Khi nào dùng technique nào.", reading: "Đọc lại notes tuần 8-9", build: "Viết RAG best practices doc. Tạo decision tree: khi nào dùng technique nào.", output: "RAG best practices doc + decision tree diagram." },
+  { id: 47, weekId: 10, title: "Agentic RAG: Khái Niệm", concept: "Agent quyết định: có cần retrieve không? Retrieve từ đâu? Cần retrieve thêm không?", reading: "LangGraph: Agentic RAG Tutorial | Anthropic: RAG with agents", build: "Design agentic RAG flow: vẽ state machine với conditional retrieval.", output: "State machine diagram cho agentic RAG." },
+  { id: 48, weekId: 10, title: "Multi-hop RAG + Corrective RAG", concept: "Multi-hop: query cần nhiều retrieval steps. CRAG: evaluate retrieval quality, retry nếu kém.", reading: "CRAG Paper — Abstract + Algorithm | LangGraph: CRAG Tutorial", build: "Implement CRAG: sau retrieval, evaluate relevance score. Nếu thấp, reformulate query.", output: "CRAG hoạt động: retry khi relevance score thấp." },
+  { id: 49, weekId: 10, title: "Tích Hợp RAG Tool vào LangGraph Agent", concept: "RAG as tool: agent gọi retrieve() như 1 tool trong toolset.", reading: "LangGraph: Retrieval Tool | LangChain: Retriever as Tool", build: "Convert RAG pipeline thành LangGraph tool. Integrate vào Research Agent.", output: "Research Agent có thể query document corpus qua RAG tool." },
+  { id: 50, weekId: 10, title: "Milestone 1: CLI Research Agent Production-Ready", concept: "Production ready: error handling, logging, tests, README, performance acceptable.", reading: "Checklist: production-ready agent", build: "Final polish: run 20 diverse queries, fix all bugs. Record demo video/screenshot.", output: "Milestone 1 complete: CLI Research Agent với RAG, tools, LangGraph." },
+  // Week 11
+  { id: 51, weekId: 11, title: "Review Tuần 10 + Checkpoint Giai Đoạn 1", concept: "Nhìn lại 10 tuần: điều gì học được sâu nhất? Điều gì vẫn còn mơ hồ?", reading: "Đọc lại toàn bộ README và notes giai đoạn 1", build: "Viết retrospective: top 3 learnings, top 3 things to improve. Update learning journal.", output: "Retrospective doc giai đoạn 1." },
+  { id: 52, weekId: 11, title: "Giới Hạn Single Agent & Multi-Agent Là Gì", concept: "Single agent: context window limited, một role duy nhất, sequential. Multi-agent: parallelism, specialization, scale.", reading: "Anthropic: Multi-agent patterns | Lilian Weng: Multi-agent section", build: "Tìm 3 tasks Research Agent không làm tốt. Giải thích tại sao multi-agent sẽ tốt hơn.", output: "Analysis: 3 limitations + multi-agent solutions." },
+  { id: 53, weekId: 11, title: "Khi Nào Nên và Không Nên Dùng Multi-Agent", concept: "Nên: tasks phức tạp, cần specialization, parallelism. Không nên: simple tasks, latency critical.", reading: "Anthropic: Building Effective Agents — Multi-agent section", build: "Tạo decision framework: flowchart khi nào dùng multi-agent.", output: "Decision flowchart + 5 examples use case." },
+  { id: 54, weekId: 11, title: "Thiết Kế Kiến Trúc Content Pipeline", concept: "Content Pipeline agents: Research → Outline → Writer → Editor → Reviewer.", reading: "Anthropic: Orchestrator-worker pattern", build: "Thiết kế full architecture: agents, data flow, interfaces. Viết ADR (Architecture Decision Record).", output: "Architecture doc + ADR cho Content Pipeline." },
+  { id: 55, weekId: 11, title: "Implement Research Worker + Outline Worker", concept: "Worker agents: focused, stateless, well-defined interface.", reading: "LangGraph: How-To Guides — Workers", build: "Implement Research Worker (web search + synthesis) và Outline Worker (structure content).", output: "2 worker agents hoạt động độc lập với tests." },
+  // Week 12
+  { id: 56, weekId: 12, title: "Review Tuần 11 + Kiểm Tra Design", concept: "Review architecture decisions. Có gì cần thay đổi sau khi implement tuần 11?", reading: "Xem lại ADR từ ngày 54", build: "Code review worker agents. Update ADR nếu cần. Fix 2 issues phát hiện.", output: "Updated ADR + fixed code." },
+  { id: 57, weekId: 12, title: "Orchestrator: Vai Trò và Thiết Kế", concept: "Orchestrator: nhận task → decompose → assign workers → aggregate → validate kết quả.", reading: "LangGraph: Supervisor Tutorial | Anthropic: Orchestrator pattern", build: "Design orchestrator state machine. Code orchestrator skeleton với LangGraph.", output: "Orchestrator skeleton với task decomposition logic." },
+  { id: 58, weekId: 12, title: "Writer Worker + Context Passing", concept: "Writer cần: outline từ Outline Worker + research từ Research Worker. Context passing between agents.", reading: "LangGraph: State sharing between agents", build: "Implement Writer Worker. Design shared state schema. Test Research → Outline → Writer pipeline.", output: "3-agent pipeline: Research → Outline → Writer hoạt động." },
+  { id: 59, weekId: 12, title: "Reviewer Worker + Reflection Loop", concept: "Reviewer đánh giá output, suggest improvements. Reflection loop: Writer retry dựa trên feedback.", reading: "Reflexion pattern trong multi-agent context", build: "Implement Reviewer Worker. Add reflection loop: Reviewer → Writer (max 2 iterations).", output: "Pipeline với reflection: content quality cải thiện qua iterations." },
+  { id: 60, weekId: 12, title: "Hoàn Thiện Orchestrator: Pipeline Đầy Đủ", concept: "Full pipeline: Research → Outline → Write → Review → (Reflection) → Final Output.", reading: "Xem lại toàn bộ pipeline code", build: "Wire toàn bộ pipeline. Test end-to-end với 3 topics. Measure latency.", output: "Full pipeline chạy end-to-end, output readable article." },
+  // Week 13
+  { id: 61, weekId: 13, title: "Review Tuần 12 + Test 3 Topics", concept: "Đánh giá pipeline quality: latency, coherence, accuracy.", reading: "Đọc lại output từ 3 topics tuần 12", build: "Rate 3 outputs: 1-5 cho coherence, accuracy, readability. Identify 3 failure modes.", output: "Quality assessment report + failure mode analysis." },
+  { id: 62, weekId: 13, title: "Supervisor Pattern vs Orchestrator-Worker", concept: "Supervisor: dynamic routing, agents decide next step. Orchestrator: predefined flow.", reading: "LangGraph: Supervisor Tutorial | Anthropic: Supervisor vs Orchestrator", build: "Implement LangGraph Supervisor cho Content Pipeline. So sánh với Orchestrator version.", output: "Supervisor implementation + comparison table." },
+  { id: 63, weekId: 13, title: "Implement LangGraph Supervisor", concept: "Supervisor prompt: phải biết tất cả workers, biết khi nào route đến đâu, khi nào FINISH.", reading: "LangGraph: Supervisor Tutorial — Supervisor prompt design", build: "Polish Supervisor: test với 5 complex topics, đảm bảo routing đúng.", output: "Supervisor pass 5/5 routing test cases." },
+  { id: 64, weekId: 13, title: "Error Handling trong Pipeline", concept: "Pipeline failures: worker timeout, bad output, infinite loop. Graceful degradation.", reading: "Python: Exception handling patterns | Circuit breaker pattern", build: "Add error handling: timeout per worker, fallback responses, max retry. Test failure scenarios.", output: "Pipeline handle tất cả failure modes gracefully." },
+  { id: 65, weekId: 13, title: "Debate Pattern + So Sánh Tất Cả Patterns", concept: "Debate: 2 agents argue different positions → synthesizer decides. Khi nào dùng.", reading: "Anthropic: Multi-agent patterns — Debate | AutoGen: Debate examples", build: "Quick implement: Debate pattern giữa 2 versions của Writer. Compare output quality.", output: "Debate pattern implemented + final pattern comparison table." },
+  // Week 14
+  { id: 66, weekId: 14, title: "Review Tuần 13 + Chọn Pattern", concept: "Quyết định pattern cuối cho Content Pipeline dựa trên tuần 13.", reading: "Đọc lại comparison table từ ngày 65", build: "ADR: chọn pattern cuối, lý do. Implement decision.", output: "ADR: pattern decision + implementation." },
+  { id: 67, weekId: 14, title: "CrewAI: Tư Duy Đội Ngũ Có Vai Trò", concept: "CrewAI: Agent = role + goal + backstory. Task = description + expected_output + agent. Crew = orchestration.", reading: "CrewAI: Core Concepts | CrewAI: Quickstart", build: "Install CrewAI. Build hello-world crew: 2 agents, 1 task. Chạy thành công.", output: "CrewAI hello world chạy, hiểu cấu trúc Agent/Task/Crew." },
+  { id: 68, weekId: 14, title: "CrewAI: Rebuild Research + Outline Agents", concept: "Translate Research Worker + Outline Worker sang CrewAI syntax.", reading: "CrewAI: Agent configuration | CrewAI: Tools", build: "Rebuild Research Agent + Outline Agent bằng CrewAI. Test với 2 topics.", output: "CrewAI versions của Research + Outline agents hoạt động." },
+  { id: 69, weekId: 14, title: "CrewAI: Thêm Writer + Editor, Hoàn Thiện Crew", concept: "Full CrewAI crew: Research → Outline → Writer → Editor. Process: sequential vs hierarchical.", reading: "CrewAI: Process types | CrewAI: Hierarchical Process", build: "Complete 4-agent CrewAI crew. Test end-to-end với 3 topics. So sánh với LangGraph version.", output: "Full CrewAI pipeline hoạt động, so sánh output quality." },
+  { id: 70, weekId: 14, title: "AutoGen: Tư Duy Conversation Giữa Agents", concept: "AutoGen: agents giao tiếp qua messages. ConversableAgent. GroupChat. Khác CrewAI.", reading: "AutoGen: Quickstart | AutoGen: Tutorial — Basic Usage", build: "Install AutoGen. Build 2-agent conversation: UserProxy + AssistantAgent. Test.", output: "AutoGen 2-agent conversation hoạt động, hiểu paradigm khác CrewAI." },
+  // Week 15
+  { id: 71, weekId: 15, title: "Review Tuần 14: So Sánh 3 Frameworks", concept: "LangGraph vs CrewAI vs AutoGen: trade-offs thực tế sau khi dùng cả 3.", reading: "Đọc lại code và notes tuần 13-14", build: "Viết comprehensive comparison: code complexity, flexibility, debugging, performance.", output: "Framework comparison doc với recommendation." },
+  { id: 72, weekId: 15, title: "4 Loại Memory của Agent", concept: "Sensory (current input), Working (in-context), Episodic (past experiences), Semantic (knowledge base).", reading: "Lilian Weng: Memory Types | Mem0: Memory types", build: "Map 4 memory types vào Content Pipeline: cái gì đã có, cái gì còn thiếu.", output: "Memory audit: gaps trong Content Pipeline." },
+  { id: 73, weekId: 15, title: "Long-term Memory: Extract & Store", concept: "Extract key facts từ conversations. Store dưới dạng structured. Retrieve khi relevant.", reading: "Mem0 Documentation | LangGraph: Memory Tutorial", build: "Implement memory extraction: sau mỗi pipeline run, extract key learnings. Store trong ChromaDB.", output: "Memory system: extract + store sau 3 test runs." },
+  { id: 74, weekId: 15, title: "Tích Hợp Memory vào Content Pipeline", concept: "Memory injection vào system prompt: past experiences → better outputs.", reading: "LangGraph: Memory in multi-agent", build: "Inject relevant memories vào Research Worker system prompt. Test: pipeline có improve không?", output: "Pipeline với memory: output improve sau 2nd run trên same topic." },
+  { id: 75, weekId: 15, title: "Episodic Memory + Conflict Resolution", concept: "Episodic memory: per-task history. Conflict: 2 memories contradict nhau → resolve bằng recency hoặc confidence.", reading: "Mem0: Conflict resolution | LangGraph: Memory management", build: "Implement episodic memory + simple conflict resolution. Test với contradicting information.", output: "Memory system handle conflicts gracefully." },
+  // Week 16
+  { id: 76, weekId: 16, title: "Review Tuần 15 + Test Memory", concept: "Đánh giá memory system: helpful? overhead? edge cases?", reading: "Đọc lại memory implementation", build: "Run 5 topics end-to-end với memory. Đo: memory giúp ở đâu, hurt ở đâu.", output: "Memory effectiveness report." },
+  { id: 77, weekId: 16, title: "3 Chiến Lược Khi Context Đầy", concept: "Truncation (đơn giản, mất info), Summarization (giữ essence), Sliding window (giữ recent).", reading: "Anthropic: Context window management | LangChain: Memory management", build: "Implement và so sánh 3 strategies với long conversation (50+ turns).", output: "Comparison: 3 strategies vs info retention vs cost." },
+  { id: 78, weekId: 16, title: "Token Counting & Budget Planning", concept: "Token budget: tổng budget = system + history + tools + response reserve. Monitor và alert.", reading: "Anthropic: Token counting | Anthropic: Pricing", build: "Build token budget tracker: alert khi >80% budget. Integrate vào pipeline.", output: "Token budget tracker trong pipeline, alert system hoạt động." },
+  { id: 79, weekId: 16, title: "Implement ContextManager", concept: "ContextManager: tự động quyết định strategy dựa trên remaining budget.", reading: "Xem lại 3 strategies từ ngày 77", build: "Implement ContextManager class: auto-select strategy, compress khi cần.", output: "ContextManager tự động handle context overflow." },
+  { id: 80, weekId: 16, title: "Tích Hợp ContextManager vào Pipeline", concept: "Wire ContextManager vào tất cả agents. Test với extreme cases.", reading: "Xem lại agent codebase", build: "Integrate ContextManager. Test với very long documents, many-turn conversations.", output: "Pipeline handle long contexts mà không crash hay lose info." },
+  // Week 17
+  { id: 81, weekId: 17, title: "Review Tuần 16 + Token Usage Report", concept: "Phân tích token usage: agent nào tốn nhiều nhất, tại sao?", reading: "Đọc lại token tracking logs", build: "Generate token usage report: per-agent breakdown. Identify top 3 optimization opportunities.", output: "Token usage report + optimization priorities." },
+  { id: 82, weekId: 17, title: "Framework Thiết Kế Multi-Agent", concept: "Systematic approach: task decomposition → agent roles → interfaces → state schema → error handling.", reading: "Anthropic: Building Effective Agents — Design principles", build: "Áp dụng framework để review Content Pipeline design. Document gaps.", output: "Design review: 5 improvements identified." },
+  { id: 83, weekId: 17, title: "Thêm Fact-Checker Agent", concept: "Fact-checker: cross-reference claims với sources. Hallucination detection.", reading: "Anthropic: Reducing hallucination | Evaluation patterns", build: "Implement Fact-Checker Agent: verify top 5 claims trong article. Flag unverified.", output: "Fact-checker hoạt động, identify ít nhất 1 unverified claim trong test article." },
+  { id: 84, weekId: 17, title: "CLI Interface + Progress Display", concept: "Rich CLI: progress bars, colored output, structured logging. User experience quan trọng.", reading: "Rich library: Progress bars | Rich: Layout", build: "Add Rich progress display: per-agent status, token usage live. Test UX.", output: "Pipeline có beautiful CLI progress display." },
+  { id: 85, weekId: 17, title: "Milestone 2: Content Pipeline Production-Ready", concept: "Milestone checklist: all agents work, error handling, logging, tests, CLI.", reading: "Production readiness checklist", build: "Final testing: 5 diverse topics. Fix all critical bugs. Record demo.", output: "Milestone 2 complete: Multi-Agent Content Pipeline." },
+  // Week 18
+  { id: 86, weekId: 18, title: "Review Tuần 17 + Checkpoint Giai Đoạn 2", concept: "Nhìn lại giai đoạn 2: multi-agent patterns, memory, context management.", reading: "Đọc lại toàn bộ notes giai đoạn 2", build: "Viết retrospective giai đoạn 2. Update portfolio với Milestone 2.", output: "Retrospective + portfolio update." },
+  { id: 87, weekId: 18, title: "Tại Sao Agent Khó Evaluate", concept: "Non-deterministic. Long chains. Latent errors. Ground truth khó định nghĩa.", reading: "Anthropic: Evaluating agents | RAGAS paper — intro", build: "List 5 failure modes của Content Pipeline. Viết evaluation criteria cho mỗi cái.", output: "Failure mode catalog + evaluation criteria." },
+  { id: 88, weekId: 18, title: "Metrics Cần Đo + Thiết Kế Golden Dataset", concept: "Metrics: task completion rate, answer relevance, faithfulness, latency, cost. Golden dataset = ground truth.", reading: "RAGAS: Metrics | LangSmith: Evaluation", build: "Tạo 10-question golden dataset cho Content Pipeline. Define expected outputs.", output: "Golden dataset 10 questions với expected outputs." },
+  { id: 89, weekId: 18, title: "Chạy Baseline Evaluation", concept: "Baseline: chạy pipeline trên golden dataset, đo tất cả metrics.", reading: "RAGAS: Quickstart | LangSmith: Evaluation Tutorial", build: "Implement eval script: chạy 10 golden queries, collect metrics.", output: "Baseline eval results: metrics cho 10 questions." },
+  { id: 90, weekId: 18, title: "Tính Metrics & Phân Tích Kết Quả", concept: "Aggregate metrics. Identify patterns trong failures. Actionable insights.", reading: "Statistics: mean, median, std cho eval metrics", build: "Analyze baseline results. Tìm: common failure patterns, worst-performing questions.", output: "Eval analysis report: patterns + actionable improvements." },
+  // Week 19
+  { id: 91, weekId: 19, title: "Review Tuần 18 + Đọc Pattern Lỗi", concept: "Deep dive vào failure patterns từ baseline evaluation.", reading: "Đọc lại eval analysis report", build: "Prioritize top 3 issues cần fix. Create improvement plan.", output: "Prioritized improvement plan." },
+  { id: 92, weekId: 19, title: "Tracing: Tại Sao Cần và Cách Hoạt Động", concept: "Trace = full execution log với inputs/outputs/timing cho mỗi node. Debug efficiently.", reading: "LangSmith: Tracing Overview | LangSmith: Quickstart", build: "Setup LangSmith. Enable tracing cho toàn bộ Content Pipeline.", output: "LangSmith dashboard hiển thị traces cho pipeline." },
+  { id: 93, weekId: 19, title: "LLM-as-Judge: Thiết Kế Rubric", concept: "LLM judge: dùng strong model (Claude Sonnet) evaluate weaker model output. Rubric = scoring criteria.", reading: "LLM-as-Judge paper — Abstract + Section 3 | Anthropic: Evaluation", build: "Design evaluation rubric: 5 criteria, 1-5 scale, với examples cho mỗi score.", output: "Evaluation rubric document với examples." },
+  { id: 94, weekId: 19, title: "Implement LLM-as-Judge", concept: "Judge prompt engineering. Chain-of-thought trong judge. Handle biases.", reading: "LLM-as-Judge: Implementation tips | Anthropic: Constitutional AI (bổ trợ)", build: "Implement LLM judge cho Content Pipeline. Test: judge score correlate với human judgment?", output: "LLM judge hoạt động, scores reasonable trên 5 test outputs." },
+  { id: 95, weekId: 19, title: "Automated Eval Pipeline + So Sánh với Human", concept: "Automated eval: chạy được nhanh, scalable. Human eval: ground truth nhưng slow.", reading: "Xem lại LLM judge implementation", build: "Build automated eval pipeline. So sánh LLM judge scores với manual rating của bạn.", output: "Correlation analysis: LLM judge vs human rating." },
+  // Week 20
+  { id: 96, weekId: 20, title: "Review Tuần 19 + Calibrate Rubric", concept: "Calibration: adjust rubric dựa trên disagreements giữa LLM judge và human.", reading: "Đọc lại correlation analysis từ ngày 95", build: "Identify 3 rubric criteria có lowest correlation. Refine those criteria.", output: "Calibrated rubric v2 với improved criteria." },
+  { id: 97, weekId: 20, title: "Prompt Injection: Direct vs Indirect", concept: "Direct injection: user input chứa malicious instructions. Indirect: từ retrieved content.", reading: "OWASP LLM Top 10 — Prompt Injection | Anthropic: Security", build: "Tạo 5 test cases cho prompt injection. Test Content Pipeline: có vulnerable không?", output: "Security test results: vulnerable points identified." },
+  { id: 98, weekId: 20, title: "Input Guardrails", concept: "Input validation: length check, content filter, intent classifier. Fail fast.", reading: "NeMo Guardrails: Input rails | Guardrails AI: Input validators", build: "Implement input guardrails: max length, profanity filter, off-topic detector.", output: "Input guardrails block 5/5 malicious test inputs." },
+  { id: 99, weekId: 20, title: "Output Guardrails", concept: "Output validation: hallucination check, PII detection, format validation, content policy.", reading: "NeMo Guardrails: Output rails | Anthropic: Content policy", build: "Implement output guardrails: fact check basic claims, detect PII, validate format.", output: "Output guardrails catch 3/3 test violation types." },
+  { id: 100, weekId: 20, title: "Tích Hợp GuardrailMiddleware + Red-Teaming", concept: "Middleware pattern: wrap toàn bộ pipeline. Red-teaming: try to break your own system.", reading: "Security testing patterns | OWASP Testing Guide (relevant sections)", build: "GuardrailMiddleware wrap pipeline. Red-team: 10 adversarial inputs. Fix 2 vulnerabilities.", output: "Secure pipeline + red-team report với mitigations." },
+  // Week 21
+  { id: 101, weekId: 21, title: "Review Tuần 20 + Ghi Lại Security Notes", concept: "Tổng hợp security: vulnerabilities found, mitigations applied, remaining risks.", reading: "Đọc lại red-team report từ ngày 100", build: "Write security notes doc. Update threat model với current mitigations.", output: "Security notes doc + updated threat model." },
+  { id: 102, weekId: 21, title: "Phân Loại Action Theo Rủi Ro", concept: "Low risk: read-only queries. Medium: write to personal files. High: publish, send email, delete.", reading: "Anthropic: Responsible scaling | Risk classification patterns", build: "Audit tất cả tools trong Content Pipeline. Classify mỗi action: Low/Medium/High risk.", output: "Risk classification table cho tất cả pipeline actions." },
+  { id: 103, weekId: 21, title: "LangGraph Interrupt: Cơ Chế Hoạt Động", concept: "interrupt_before/interrupt_after: pause graph execution. Human provides feedback. Resume.", reading: "LangGraph: Human-in-the-Loop | LangGraph: Breakpoints Tutorial", build: "Implement basic interrupt: pause trước khi publish. Print pending action cho user.", output: "Graph pause và resume sau human input thành công." },
+  { id: 104, weekId: 21, title: "Thêm Approval Step vào Content Pipeline", concept: "Approval step cho High-risk actions. Show context: tại sao action này, preview output.", reading: "UX patterns cho approval flows | LangGraph: Human approval", build: "Add approval step trước khi Writer publish article. Show preview, ask confirm.", output: "Pipeline pause ở approval step, resume sau confirm." },
+  { id: 105, weekId: 21, title: "Dry-run Mode + Undo Mechanism", concept: "Dry-run: simulate tất cả actions mà không execute. Undo: revert last action.", reading: "Software patterns: Command pattern (undo) | Preview-before-execute", build: "Implement dry-run flag: show planned actions. Implement undo cho 1 reversible action.", output: "Dry-run mode hoạt động. Undo khôi phục state." },
+  // Week 22
+  { id: 106, weekId: 22, title: "Review Tuần 21 + End-to-end HITL Test", concept: "Full HITL flow: run pipeline, review approvals, test dry-run, test undo.", reading: "Đọc lại HITL implementation", build: "End-to-end test: 3 topics với HITL enabled. Document UX issues.", output: "HITL test report + UX improvements list." },
+  { id: 107, weekId: 22, title: "Structured Output: Tại Sao Cần Pydantic", concept: "Unstructured output: fragile parsing, bugs. Pydantic: type safety, validation, clear interfaces.", reading: "Pydantic: Getting Started | Anthropic: Structured Output", build: "Audit current agent outputs: tìm 3 places dùng string parsing. Plan Pydantic migration.", output: "Migration plan: 3 places cần Pydantic." },
+  { id: 108, weekId: 22, title: "Migrate Research + Outline Workers", concept: "Define Pydantic models cho Research output (sources, summary) và Outline (sections, structure).", reading: "Pydantic: Model definition | Anthropic: tool_choice with structured output", build: "Migrate Research Worker + Outline Worker sang Pydantic output models.", output: "2 workers output Pydantic objects thay vì strings." },
+  { id: 109, weekId: 22, title: "Migrate Writer + Reviewer, Hoàn Thiện Pipeline", concept: "Writer output: Article model. Reviewer output: ReviewResult với scores + feedback.", reading: "Pydantic: Validators | Pydantic: Nested models", build: "Migrate Writer + Reviewer. Wire toàn bộ pipeline với Pydantic. Run end-to-end test.", output: "Full pipeline với Pydantic: no more string parsing bugs." },
+  { id: 110, weekId: 22, title: "Self-Reflection Loop Nâng Cao", concept: "Advanced reflection: structured critique → structured revision. Track improvement metrics.", reading: "Reflexion paper: Section 5 (advanced) | LangGraph: Reflection pattern", build: "Upgrade reflection loop: Writer nhận ReviewResult Pydantic object, revise targeted sections.", output: "Targeted revision: Writer cải thiện specific sections dựa trên structured feedback." },
+  // Week 23
+  { id: 111, weekId: 23, title: "Review Tuần 22 + So Sánh Trước/Sau", concept: "Measure improvement từ Pydantic migration: fewer bugs, better type safety.", reading: "Đọc lại migration notes", build: "Run eval suite: before Pydantic vs after. Count parsing errors. Compare output quality.", output: "Before/after comparison report." },
+  { id: 112, weekId: 23, title: "Cost Optimization: Model Routing & Prompt Caching", concept: "Model routing: Haiku cho simple tasks, Sonnet cho complex. Caching: reuse expensive prompts.", reading: "Anthropic: Prompt Caching | Anthropic: Model Overview (pricing comparison)", build: "Implement model router: classify task complexity → route đến Haiku/Sonnet. Enable caching.", output: "Cost reduction: 20%+ từ routing + caching." },
+  { id: 113, weekId: 23, title: "Latency Optimization: Streaming & Parallel Execution", concept: "Streaming: first token sớm → better UX. Parallel: chạy independent agents đồng thời.", reading: "Anthropic: Streaming | LangChain: Streaming | asyncio patterns", build: "Enable streaming cho Writer output. Parallelize Research + independent workers.", output: "Latency giảm 30%+ với streaming + parallel execution." },
+  { id: 114, weekId: 23, title: "Reliability: Circuit Breaker & Retry với Backoff", concept: "Circuit breaker: fail fast khi service down, avoid cascade failures. Retry: recover từ transient errors.", reading: "Circuit breaker pattern | tenacity library docs", build: "Implement circuit breaker cho external APIs. Verify retry logic từ tuần 5 vẫn hoạt động.", output: "Pipeline resilient: handle API outages gracefully." },
+  { id: 115, weekId: 23, title: "Tích Hợp: Optimization Layer vào Pipeline", concept: "Combine tất cả optimizations. Measure cumulative impact.", reading: "Performance optimization patterns", build: "Integrate model routing + caching + streaming + circuit breaker. Run full benchmark.", output: "Optimization report: cost -30%, latency -30%, reliability +." },
+  // Week 24
+  { id: 116, weekId: 24, title: "Review & Benchmark Tuần 23", concept: "Final performance baseline trước production packaging.", reading: "Đọc lại benchmark results tuần 23", build: "Run comprehensive benchmark: 20 diverse topics. Document all metrics.", output: "Final benchmark report: production-ready metrics." },
+  { id: 117, weekId: 24, title: "Architecture Review: Bức Tranh Toàn Cảnh", concept: "End-to-end architecture: từ CLI input đến final output. All components, interactions, data flows.", reading: "Đọc lại toàn bộ ADRs và architecture docs", build: "Draw final architecture diagram. Update docs với actual implementation.", output: "Final architecture diagram + updated docs." },
+  { id: 118, weekId: 24, title: "Packaging: Cấu Trúc Project Chuẩn Production", concept: "Production structure: src layout, pyproject.toml, env management, config files, Makefile.", reading: "Python: Packaging best practices | pyproject.toml spec", build: "Restructure project: proper package layout, pyproject.toml, Makefile với common commands.", output: "Project có proper Python package structure." },
+  { id: 119, weekId: 24, title: "Deploy: Chạy Agent như một Service", concept: "FastAPI wrapper: REST endpoints cho agent. Dockerfile. Environment variables cho secrets.", reading: "FastAPI: Getting Started | Docker: Python best practices", build: "Add FastAPI layer: POST /run endpoint. Dockerfile. Test với docker run.", output: "Agent chạy như REST service trong Docker." },
+  { id: 120, weekId: 24, title: "Milestone 3: Tổng Kết 120 Ngày", concept: "Portfolio: 3 projects, skills gained, what's next. Celebrate completing the journey!", reading: "Đọc lại toàn bộ learning journal", build: "Write final retrospective. Update portfolio. Plan next 30 days. Share on LinkedIn/GitHub.", output: "Milestone 3 complete: Production AI Agent System. 120-day journey done!" }
+];
+
+// =============================================
+// CONSTANTS & HELPERS
+// =============================================
+const STORAGE_KEY = "agent_learning_v1";
+const NOTES_TEMPLATE = `## Đã học hôm nay
+-
+
+## Code đã thực hành
+\`\`\`python
+
+\`\`\`
+
+## Câu hỏi còn chưa rõ
+-
+
+## Nguồn tham khảo đã đọc
+- `;
+
+const RESOURCE_ICONS = { paper: "📄", docs: "📖", github: "💻", blog: "✍️", course: "🎓" };
+const RESOURCE_LABELS = { paper: "Paper", docs: "Docs", github: "GitHub", blog: "Blog", course: "Course" };
+
+function starRating(d) {
+  return "★".repeat(d) + "☆".repeat(4 - d);
+}
+function formatHours(h) {
+  if (!h || h === 0) return "0h";
+  const hrs = Math.floor(h);
+  const mins = Math.round((h - hrs) * 60);
+  if (mins === 0) return `${hrs}h`;
+  return `${hrs}h ${mins}p`;
+}
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+// =============================================
+// STORAGE
+// =============================================
+function defaultProgress() {
+  const wp = {}, hl = {}, wn = {};
+  for (let i = 1; i <= 24; i++) { wp[i] = "not-started"; hl[i] = 0; wn[i] = ""; }
+  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
+}
+let progress = defaultProgress();
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const stored = JSON.parse(raw);
+      progress = { ...defaultProgress(), ...stored };
+      progress.settings = { ...defaultProgress().settings, ...(stored.settings || {}) };
+    }
+  } catch(e) {}
+}
+function saveProgress() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch(e) {}
+}
+const debouncedSave = debounce(saveProgress, 400);
+
+// =============================================
+// COMPUTED
+// =============================================
+function getCompleted() { return Object.values(progress.weekStatus).filter(s => s === "completed").length; }
+function getInProgress() { return Object.values(progress.weekStatus).filter(s => s === "in-progress").length; }
+function getOverallPct() { return Math.round((getCompleted() / 24) * 100); }
+function getTotalHours() { return Object.values(progress.hoursLogged).reduce((a, b) => a + (b || 0), 0); }
+function getCurrentWeek() {
+  for (let i = 1; i <= 24; i++) {
+    if (progress.weekStatus[i] === "in-progress") return i;
+  }
+  for (let i = 1; i <= 24; i++) {
+    if (progress.weekStatus[i] === "not-started") return i;
+  }
+  return 24;
+}
+function getDaysSinceStart() {
+  if (!progress.startDate) return 0;
+  return Math.floor((Date.now() - new Date(progress.startDate).getTime()) / 86400000);
+}
+function getPhaseStats(phaseId) {
+  const phase = PHASES[phaseId - 1];
+  const completed = phase.weeks.filter(w => progress.weekStatus[w] === "completed").length;
+  const inProgress = phase.weeks.filter(w => progress.weekStatus[w] === "in-progress").length;
+  return { completed, inProgress, total: phase.weeks.length, pct: Math.round((completed / phase.weeks.length) * 100) };
+}
+
+// =============================================
+// NAVIGATION STATE
+// =============================================
+let currentView = "dashboard"; // "dashboard" | "week"
+let currentWeekId = null;
+let activeTopicFilter = "all";
+
+// =============================================
+// SIDEBAR RENDER
+// =============================================
+function renderSidebar() {
+  const nav = document.getElementById("week-nav");
+  const dashLink = document.getElementById("dashboard-link");
+  dashLink.classList.toggle("active", currentView === "dashboard");
+
+  // Remove old phase groups
+  nav.querySelectorAll(".phase-group").forEach(el => el.remove());
+
+  PHASES.forEach(phase => {
+    const group = document.createElement("div");
+    group.className = "phase-group";
+    group.innerHTML = `
+      <div class="phase-header" onclick="togglePhaseCollapse(${phase.id})">
+        <div class="phase-dot" style="background:${phase.color}"></div>
+        <span>${phase.title}: ${phase.titleLong}</span>
+        <span class="phase-arrow">▾</span>
+      </div>
+      <div class="phase-weeks"></div>
+    `;
+    const weeksContainer = group.querySelector(".phase-weeks");
+    phase.weeks.forEach(wid => {
+      const week = WEEKS[wid - 1];
+      const status = progress.weekStatus[wid] || "not-started";
+      const li = document.createElement("div");
+      li.className = `week-item ${currentWeekId === wid && currentView === "week" ? "active" : ""}`;
+      li.dataset.weekId = wid;
+      li.onclick = () => navigateToWeek(wid);
+      li.innerHTML = `
+        <div class="status-dot ${status}"></div>
+        <span class="week-item-label">T${wid}: ${week.title}</span>
+        <span class="week-item-num">★${week.difficulty}</span>
+      `;
+      weeksContainer.appendChild(li);
+    });
+    nav.appendChild(group);
+  });
+
+  updateMiniStats();
+}
+
+function togglePhaseCollapse(phaseId) {
+  const groups = document.querySelectorAll(".phase-group");
+  // find the right one
+  const header = [...document.querySelectorAll(".phase-header")].find(h => h.onclick.toString().includes(`(${phaseId})`));
+  if (header) header.closest(".phase-group").classList.toggle("collapsed");
+}
+
+function updateMiniStats() {
+  const pct = getOverallPct();
+  const done = getCompleted();
+  const circumference = 2 * Math.PI * 18; // r=18
+  const offset = circumference * (1 - pct / 100);
+  const ring = document.getElementById("mini-ring-fg");
+  if (ring) { ring.style.strokeDasharray = circumference; ring.style.strokeDashoffset = offset; }
+  const pctEl = document.getElementById("mini-ring-pct");
+  if (pctEl) pctEl.textContent = pct + "%";
+  const doneEl = document.getElementById("mini-done-label");
+  if (doneEl) doneEl.textContent = `${done} / 24 tuần`;
+  const hoursEl = document.getElementById("mini-hours");
+  if (hoursEl) hoursEl.textContent = formatHours(getTotalHours());
+  const currentW = getCurrentWeek();
+  const streakEl = document.getElementById("mini-streak");
+  if (streakEl) streakEl.textContent = `T${currentW}`;
+}
+
+// =============================================
+// DASHBOARD RENDER
+// =============================================
+function renderDashboard() {
+  currentView = "dashboard";
+  document.getElementById("dashboard-view").style.display = "";
+  document.getElementById("week-view").style.display = "none";
+  document.getElementById("main-content").scrollTop = 0;
+
+  const pct = getOverallPct();
+  const done = getCompleted();
+  const hours = getTotalHours();
+  const curWeek = getCurrentWeek();
+  const days = getDaysSinceStart();
+
+  document.getElementById("stat-pct").textContent = pct + "%";
+  document.getElementById("stat-pct-sub").textContent = `${done} / 24 tuần`;
+  document.getElementById("stat-hours").textContent = formatHours(hours);
+  document.getElementById("stat-week").textContent = `T${curWeek}`;
+  const curWeekData = WEEKS[curWeek - 1];
+  document.getElementById("stat-week-title").textContent = curWeekData ? curWeekData.title.substring(0, 25) : "";
+  document.getElementById("stat-days").textContent = days;
+  document.getElementById("stat-start").textContent = progress.startDate ? `Bắt đầu ${new Date(progress.startDate).toLocaleDateString("vi-VN")}` : "Chưa bắt đầu";
+
+  // Phase cards
+  const phaseCards = document.getElementById("phase-cards");
+  phaseCards.innerHTML = "";
+  PHASES.forEach(phase => {
+    const stats = getPhaseStats(phase.id);
+    const card = document.createElement("div");
+    card.className = "phase-card";
+    card.onclick = () => navigateToWeek(phase.weeks[0]);
+    card.innerHTML = `
+      <div class="phase-card-head">
+        <div class="phase-card-title" style="color:${phase.color}">${phase.title}</div>
+        <div class="phase-card-badge" style="background:${phase.color}22;color:${phase.color};border:1px solid ${phase.color}44">${stats.pct}%</div>
+      </div>
+      <div class="phase-card-project" style="color:var(--text-muted)">🗂 ${phase.project}</div>
+      <div class="phase-bar-track"><div class="phase-bar-fill" style="width:${stats.pct}%;background:${phase.color}"></div></div>
+      <div class="phase-card-counts">${stats.completed}/${stats.total} tuần hoàn thành · ${phase.titleLong}</div>
+    `;
+    phaseCards.appendChild(card);
+  });
+
+  // Timeline
+  const timeline = document.getElementById("timeline-grid");
+  timeline.innerHTML = "";
+  for (let i = 1; i <= 24; i++) {
+    const status = progress.weekStatus[i] || "not-started";
+    const week = WEEKS[i - 1];
+    const phase = PHASES[week.phase - 1];
+    const cell = document.createElement("div");
+    cell.className = `timeline-cell ${status}`;
+    cell.title = `Tuần ${i}: ${week.title}`;
+    cell.onclick = () => navigateToWeek(i);
+    cell.innerHTML = `
+      <div class="tc-dot"></div>
+      <div class="tc-num">${i}</div>
+      <div class="tc-lbl" style="color:${phase.color}88">G${week.phase}</div>
+    `;
+    timeline.appendChild(cell);
+  }
+
+  renderSidebar();
+}
+
+// =============================================
+// WEEK DETAIL RENDER
+// =============================================
+function renderWeekDetail(weekId) {
+  const week = WEEKS[weekId - 1];
+  const phase = PHASES[week.phase - 1];
+  const status = progress.weekStatus[weekId] || "not-started";
+
+  currentView = "week";
+  currentWeekId = weekId;
+
+  document.getElementById("dashboard-view").style.display = "none";
+  document.getElementById("week-view").style.display = "";
+  document.getElementById("main-content").scrollTop = 0;
+
+  // Header
+  const phaseBadge = document.getElementById("wv-phase-badge");
+  phaseBadge.textContent = phase.title;
+  phaseBadge.style.background = phase.color + "22";
+  phaseBadge.style.color = phase.color;
+  phaseBadge.style.border = `1px solid ${phase.color}44`;
+
+  document.getElementById("wv-difficulty").textContent = starRating(week.difficulty);
+  document.getElementById("wv-week-num").textContent = `Tuần ${weekId} / 24`;
+  document.getElementById("wv-title").textContent = week.title;
+  document.getElementById("wv-subtopic").textContent = week.subtopic;
+
+  // Status buttons
+  document.querySelectorAll(".status-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.status === status);
+  });
+
+  // Questions
+  const qList = document.getElementById("wv-questions");
+  if (week.questions && week.questions.length > 0) {
+    document.getElementById("wv-questions-block").style.display = "";
+    qList.innerHTML = week.questions.map(q => `<li>${q}</li>`).join("");
+  } else {
+    document.getElementById("wv-questions-block").style.display = "none";
+  }
+
+  // Topics
+  renderTopics(week);
+
+  // Day cards
+  renderDays(weekId);
+
+  // Deliverable
+  document.getElementById("wv-deliverable").innerHTML = `<strong>✦</strong> ${week.deliverable}`;
+
+  // Resources
+  const resourcesList = document.getElementById("wv-resources");
+  if (week.resources && week.resources.length > 0) {
+    document.getElementById("wv-resources-block").style.display = "";
+    resourcesList.innerHTML = week.resources.map(r => `
+      <a class="resource-card" href="${r.url}" target="_blank" rel="noopener noreferrer">
+        <span class="resource-icon">${RESOURCE_ICONS[r.type] || "🔗"}</span>
+        <div class="resource-body">
+          <div class="resource-title">${r.title}</div>
+          <div class="resource-desc">${r.desc}</div>
+        </div>
+        <span class="resource-type-tag">${RESOURCE_LABELS[r.type] || r.type}</span>
+        <span class="resource-arrow">↗</span>
+      </a>
+    `).join("");
+  } else {
+    document.getElementById("wv-resources-block").style.display = "none";
+  }
+
+  // Hours
+  const hours = progress.hoursLogged[weekId] || 0;
+  document.getElementById("wv-hours").value = hours || "";
+  const totalHours = getTotalHours();
+  document.getElementById("wv-hours-total").textContent = `Tổng: ${formatHours(totalHours)}`;
+
+  // Notes
+  let notes = progress.weekNotes[weekId];
+  if (!notes || notes === "") notes = NOTES_TEMPLATE;
+  document.getElementById("wv-notes").value = notes;
+  document.getElementById("wv-notes-preview").innerHTML = renderMarkdown(notes);
+  document.getElementById("autosave-hint").textContent = "Tự động lưu";
+  document.getElementById("autosave-hint").classList.remove("saved");
+  // Ensure edit tab is active
+  switchNotesTab("edit");
+
+  // Prev/Next
+  const prevBtn = document.getElementById("btn-prev-week");
+  const nextBtn = document.getElementById("btn-next-week");
+  const prevLabel = document.getElementById("prev-week-label");
+  const nextLabel = document.getElementById("next-week-label");
+
+  if (weekId > 1) {
+    prevBtn.disabled = false;
+    prevLabel.textContent = `T${weekId - 1}: ${WEEKS[weekId - 2].title.substring(0, 20)}`;
+  } else {
+    prevBtn.disabled = true;
+    prevLabel.textContent = "";
+  }
+  if (weekId < 24) {
+    nextBtn.disabled = false;
+    nextLabel.textContent = `T${weekId + 1}: ${WEEKS[weekId].title.substring(0, 20)}`;
+  } else {
+    nextBtn.disabled = true;
+    nextLabel.textContent = "";
+  }
+
+  renderSidebar();
+
+  // Set start date on first interaction
+  if (!progress.startDate) {
+    progress.startDate = new Date().toISOString().split("T")[0];
+    saveProgress();
+  }
+}
+
+function renderTopics(week) {
+  const topicList = document.getElementById("wv-topics");
+  topicList.innerHTML = "";
+  week.topics.forEach(topic => {
+    const item = document.createElement("div");
+    item.className = "topic-item";
+    item.dataset.type = topic.type;
+    item.innerHTML = `
+      <span class="type-badge ${topic.type}">${topic.type === "concept" ? "Concept" : topic.type === "code" ? "Code" : "Eval"}</span>
+      <span class="topic-text">${topic.label}</span>
+      ${topic.isNew ? '<span class="topic-new-badge">MỚI</span>' : ""}
+    `;
+    if (activeTopicFilter !== "all" && topic.type !== activeTopicFilter) {
+      item.style.display = "none";
+    }
+    topicList.appendChild(item);
+  });
+
+  // Update filter buttons
+  document.querySelectorAll(".topic-filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tf === activeTopicFilter);
+  });
+}
+
+// =============================================
+// DAY CARDS
+// =============================================
+function escapeHtml(str) {
+  if (!str) return "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function toggleDayCard(dayId) {
+  const card = document.getElementById("day-card-" + dayId);
+  if (!card) return;
+  card.classList.toggle("open");
+}
+
+function renderDays(weekId) {
+  const container = document.getElementById("wv-days");
+  const block = document.getElementById("wv-days-block");
+  if (!container) return;
+
+  const days = DAYS.filter(d => d.weekId === weekId);
+  if (days.length === 0) {
+    if (block) block.style.display = "none";
+    return;
+  }
+  if (block) block.style.display = "";
+
+  container.innerHTML = days.map(day => `
+    <div class="day-card" id="day-card-${day.id}" onclick="toggleDayCard(${day.id})">
+      <div class="day-card-header">
+        <span class="day-num-badge">Ngày ${day.id}</span>
+        <span class="day-card-title">${escapeHtml(day.title)}</span>
+        <span class="day-card-arrow">▾</span>
+      </div>
+      <div class="day-card-body">
+        <div class="day-section">
+          <div class="day-section-label">🧠 Concept</div>
+          <div class="day-section-content">${escapeHtml(day.concept)}</div>
+        </div>
+        <div class="day-section">
+          <div class="day-section-label">📖 Đọc</div>
+          <div class="day-section-content">${escapeHtml(day.reading)}</div>
+        </div>
+        <div class="day-section">
+          <div class="day-section-label">🔨 Build</div>
+          <div class="day-section-content">${escapeHtml(day.build)}</div>
+        </div>
+        <div class="day-section">
+          <div class="day-section-label">✅ Output</div>
+          <div class="day-section-content">${escapeHtml(day.output)}</div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+// =============================================
+// ACTIONS
+// =============================================
+function navigateToDashboard() {
+  currentWeekId = null;
+  renderDashboard();
+  closeSidebarIfMobile();
+}
+
+function navigateToWeek(weekId) {
+  if (progress.settings) progress.settings.lastVisitedWeek = weekId;
+  renderWeekDetail(weekId);
+  closeSidebarIfMobile();
+}
+
+function navigatePrev() {
+  if (currentWeekId > 1) navigateToWeek(currentWeekId - 1);
+}
+function navigateNext() {
+  if (currentWeekId < 24) navigateToWeek(currentWeekId + 1);
+}
+
+function setWeekStatus(weekId, status) {
+  progress.weekStatus[weekId] = status;
+  saveProgress();
+  // Update status buttons
+  document.querySelectorAll(".status-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.status === status);
+  });
+  // Update sidebar dot
+  const dot = document.querySelector(`.week-item[data-week-id="${weekId}"] .status-dot`);
+  if (dot) { dot.className = `status-dot ${status}`; }
+  updateMiniStats();
+  showToast(status === "completed" ? "✓ Hoàn thành tuần này!" : status === "in-progress" ? "⟳ Đánh dấu đang học" : "Đặt lại chưa bắt đầu", status === "completed" ? "success" : "info");
+}
+
+function saveHours() {
+  const val = parseFloat(document.getElementById("wv-hours").value) || 0;
+  progress.hoursLogged[currentWeekId] = val;
+  debouncedSave();
+  const total = getTotalHours();
+  document.getElementById("wv-hours-total").textContent = `Tổng: ${formatHours(total)}`;
+  updateMiniStats();
+}
+
+const debouncedSaveNotes = debounce(() => {
+  if (!currentWeekId) return;
+  const notes = document.getElementById("wv-notes").value;
+  progress.weekNotes[currentWeekId] = notes;
+  saveProgress();
+  const hint = document.getElementById("autosave-hint");
+  hint.textContent = "Đã lưu ✓";
+  hint.classList.add("saved");
+  setTimeout(() => { hint.textContent = "Tự động lưu"; hint.classList.remove("saved"); }, 2000);
+  // Update preview if visible
+  const preview = document.getElementById("wv-notes-preview");
+  if (preview.classList.contains("visible")) {
+    preview.innerHTML = renderMarkdown(notes);
+  }
+}, 600);
+
+function resetNotesTemplate() {
+  if (!confirm("Khôi phục template mẫu? Ghi chú hiện tại sẽ bị xóa.")) return;
+  document.getElementById("wv-notes").value = NOTES_TEMPLATE;
+  progress.weekNotes[currentWeekId] = NOTES_TEMPLATE;
+  saveProgress();
+  showToast("Đã khôi phục template", "info");
+}
+
+function switchNotesTab(tab) {
+  const textarea = document.getElementById("wv-notes");
+  const preview = document.getElementById("wv-notes-preview");
+  const tabs = document.querySelectorAll(".notes-tab");
+  if (tab === "edit") {
+    textarea.style.display = "";
+    preview.classList.remove("visible");
+    tabs[0].classList.add("active");
+    tabs[1].classList.remove("active");
+  } else {
+    const notes = textarea.value;
+    preview.innerHTML = renderMarkdown(notes);
+    textarea.style.display = "none";
+    preview.classList.add("visible");
+    tabs[0].classList.remove("active");
+    tabs[1].classList.add("active");
+  }
+}
+
+function setTopicFilter(filter) {
+  activeTopicFilter = filter;
+  if (currentWeekId) {
+    const week = WEEKS[currentWeekId - 1];
+    renderTopics(week);
+  }
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.dataset.theme === "dark";
+  html.dataset.theme = isDark ? "light" : "dark";
+  document.getElementById("theme-toggle").textContent = isDark ? "🌙" : "☀️";
+  if (progress.settings) progress.settings.darkMode = !isDark;
+  saveProgress();
+}
+
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("sidebar-overlay").classList.toggle("show");
+}
+function closeSidebarIfMobile() {
+  if (window.innerWidth <= 768) {
+    document.getElementById("sidebar").classList.remove("open");
+    document.getElementById("sidebar-overlay").classList.remove("show");
+  }
+}
+
+// Global filter pills
+document.querySelectorAll(".filter-pill").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter-pill").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const filter = btn.dataset.filter;
+    activeTopicFilter = filter;
+    if (currentView === "week" && currentWeekId) {
+      renderTopics(WEEKS[currentWeekId - 1]);
+    }
+  });
+});
+
+// =============================================
+// MARKDOWN RENDERER (minimal, no deps)
+// =============================================
+function renderMarkdown(text) {
+  if (!text) return '<p style="color:var(--text-muted);font-style:italic">Chưa có ghi chú...</p>';
+  let html = text
+    // Escape HTML
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    // Code blocks
+    .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code.trim()}</code></pre>`)
+    // Inline code
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    // Bold
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    // Italic
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    // H2
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    // H3
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    // Blockquote
+    .replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>")
+    // Unordered list items
+    .replace(/^[-*] (.+)$/gm, "<li>$1</li>")
+    // Wrap consecutive li tags
+    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    // Links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    // Paragraphs (double newline)
+    .replace(/\n\n+/g, "\n\n")
+    .split("\n\n")
+    .map(block => {
+      block = block.trim();
+      if (!block) return "";
+      if (block.startsWith("<h") || block.startsWith("<ul") || block.startsWith("<pre") || block.startsWith("<blockquote")) return block;
+      return `<p>${block.replace(/\n/g, "<br>")}</p>`;
+    })
+    .join("\n");
+  return html;
+}
+
+// =============================================
+// TOAST
+// =============================================
+let toastTimer;
+function showToast(msg, type = "info") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ""; }, 2500);
+}
+
+// =============================================
+// INIT
+// =============================================
+function init() {
+  loadProgress();
+
+  // Apply theme
+  const isDark = progress.settings?.darkMode !== false;
+  document.documentElement.dataset.theme = isDark ? "dark" : "light";
+  document.getElementById("theme-toggle").textContent = isDark ? "🌙" : "☀️";
+
+  // Navigate to last visited week or dashboard
+  const lastWeek = progress.settings?.lastVisitedWeek;
+  if (lastWeek) {
+    renderWeekDetail(lastWeek);
+  } else {
+    renderDashboard();
+  }
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
