@@ -940,6 +940,36 @@ textarea:focus, input:focus { border-color: var(--blue); }
   cursor: pointer;
 }
 .btn-chat-clear:hover { border-color: #ef4444; color: #ef4444; }
+/* Day status button */
+.day-status-btn {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px; font-weight: 700;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: transparent; padding: 0;
+}
+.day-status-btn:hover { border-color: var(--blue); color: var(--blue); }
+.day-status-btn.in-progress { border-color: var(--blue); color: var(--blue); background: rgba(59,130,246,0.12); }
+.day-status-btn.completed { border-color: var(--green); color: var(--green); background: rgba(34,197,94,0.12); }
+/* Week day progress bar */
+.week-day-progress {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px; flex-wrap: wrap;
+}
+.day-prog-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 1.5px solid var(--border-light);
+  background: transparent; display: inline-block;
+  cursor: default;
+}
+.day-prog-dot.in-progress { border-color: var(--blue); background: rgba(59,130,246,0.3); }
+.day-prog-dot.completed { border-color: var(--green); background: var(--green); }
+.day-prog-label { font-size: 12px; color: var(--text-muted); margin-left: 2px; }
 .day-notes-section {
   margin-top: 12px;
   padding-top: 12px;
@@ -1066,11 +1096,7 @@ textarea:focus, input:focus { border-color: var(--blue); }
           </div>
           <h1 class="week-view-title" id="wv-title"></h1>
           <div class="week-view-subtopic" id="wv-subtopic"></div>
-          <div class="status-btns" id="wv-status-btns">
-            <button class="status-btn" data-status="not-started" onclick="setWeekStatus(currentWeekId,'not-started')">Chưa bắt đầu</button>
-            <button class="status-btn" data-status="in-progress" onclick="setWeekStatus(currentWeekId,'in-progress')">⟳ Đang học</button>
-            <button class="status-btn" data-status="completed" onclick="setWeekStatus(currentWeekId,'completed')">✓ Hoàn thành</button>
-          </div>
+          <div class="week-day-progress" id="wv-day-progress"></div>
         </div>
 
         <div class="block" id="wv-questions-block">
@@ -1885,7 +1911,7 @@ function debounce(fn, ms) {
 function defaultProgress() {
   const wp = {}, hl = {}, wn = {};
   for (let i = 1; i <= 24; i++) { wp[i] = "not-started"; hl[i] = 0; wn[i] = ""; }
-  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, dayNotes: {}, dayChatLinks: {}, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
+  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, dayNotes: {}, dayStatus: {}, dayChatLinks: {}, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
 }
 let progress = defaultProgress();
 
@@ -1898,6 +1924,7 @@ function loadProgress() {
       progress.settings = { ...defaultProgress().settings, ...(stored.settings || {}) };
       if (!progress.dayChatLinks) progress.dayChatLinks = {};
       if (!progress.dayNotes) progress.dayNotes = {};
+      if (!progress.dayStatus) progress.dayStatus = {};
     }
   } catch(e) {}
 }
@@ -1909,16 +1936,27 @@ const debouncedSave = debounce(saveProgress, 400);
 // =============================================
 // COMPUTED
 // =============================================
-function getCompleted() { return Object.values(progress.weekStatus).filter(s => s === "completed").length; }
-function getInProgress() { return Object.values(progress.weekStatus).filter(s => s === "in-progress").length; }
-function getOverallPct() { return Math.round((getCompleted() / 24) * 100); }
+function getDayStatus(dayId) { return progress.dayStatus[dayId] || "not-started"; }
+function getCompletedDays() { return DAYS.filter(d => getDayStatus(d.id) === "completed").length; }
+function getInProgressDays() { return DAYS.filter(d => getDayStatus(d.id) === "in-progress").length; }
+function getCompleted() { return getCompletedDays(); }
+function getInProgress() { return getInProgressDays(); }
+function getOverallPct() { return Math.round((getCompletedDays() / 120) * 100); }
 function getTotalHours() { return Object.values(progress.hoursLogged).reduce((a, b) => a + (b || 0), 0); }
+function getWeekStatusFromDays(weekId) {
+  const days = DAYS.filter(d => d.weekId === weekId);
+  const done = days.filter(d => getDayStatus(d.id) === "completed").length;
+  const active = days.filter(d => getDayStatus(d.id) === "in-progress").length;
+  if (done === days.length && days.length > 0) return "completed";
+  if (done > 0 || active > 0) return "in-progress";
+  return "not-started";
+}
 function getCurrentWeek() {
   for (let i = 1; i <= 24; i++) {
-    if (progress.weekStatus[i] === "in-progress") return i;
+    if (getWeekStatusFromDays(i) === "in-progress") return i;
   }
   for (let i = 1; i <= 24; i++) {
-    if (progress.weekStatus[i] === "not-started") return i;
+    if (getWeekStatusFromDays(i) === "not-started") return i;
   }
   return 24;
 }
@@ -1928,9 +1966,9 @@ function getDaysSinceStart() {
 }
 function getPhaseStats(phaseId) {
   const phase = PHASES[phaseId - 1];
-  const completed = phase.weeks.filter(w => progress.weekStatus[w] === "completed").length;
-  const inProgress = phase.weeks.filter(w => progress.weekStatus[w] === "in-progress").length;
-  return { completed, inProgress, total: phase.weeks.length, pct: Math.round((completed / phase.weeks.length) * 100) };
+  const phaseDays = DAYS.filter(d => phase.weeks.includes(d.weekId));
+  const completed = phaseDays.filter(d => getDayStatus(d.id) === "completed").length;
+  return { completed, total: phaseDays.length, pct: Math.round((completed / phaseDays.length) * 100) };
 }
 
 // =============================================
@@ -1965,7 +2003,7 @@ function renderSidebar() {
     const weeksContainer = group.querySelector(".phase-weeks");
     phase.weeks.forEach(wid => {
       const week = WEEKS[wid - 1];
-      const status = progress.weekStatus[wid] || "not-started";
+      const status = getWeekStatusFromDays(wid);
       const li = document.createElement("div");
       li.className = `week-item ${currentWeekId === wid && currentView === "week" ? "active" : ""}`;
       li.dataset.weekId = wid;
@@ -2024,7 +2062,7 @@ function renderDashboard() {
   const days = getDaysSinceStart();
 
   document.getElementById("stat-pct").textContent = pct + "%";
-  document.getElementById("stat-pct-sub").textContent = `${done} / 24 tuần`;
+  document.getElementById("stat-pct-sub").textContent = `${done} / 120 ngày`;
   document.getElementById("stat-hours").textContent = formatHours(hours);
   document.getElementById("stat-week").textContent = `T${curWeek}`;
   const curWeekData = WEEKS[curWeek - 1];
@@ -2047,7 +2085,7 @@ function renderDashboard() {
       </div>
       <div class="phase-card-project" style="color:var(--text-muted)">🗂 ${phase.project}</div>
       <div class="phase-bar-track"><div class="phase-bar-fill" style="width:${stats.pct}%;background:${phase.color}"></div></div>
-      <div class="phase-card-counts">${stats.completed}/${stats.total} tuần hoàn thành · ${phase.titleLong}</div>
+      <div class="phase-card-counts">${stats.completed}/${stats.total} ngày hoàn thành · ${phase.titleLong}</div>
     `;
     phaseCards.appendChild(card);
   });
@@ -2056,7 +2094,7 @@ function renderDashboard() {
   const timeline = document.getElementById("timeline-grid");
   timeline.innerHTML = "";
   for (let i = 1; i <= 24; i++) {
-    const status = progress.weekStatus[i] || "not-started";
+    const status = getWeekStatusFromDays(i);
     const week = WEEKS[i - 1];
     const phase = PHASES[week.phase - 1];
     const cell = document.createElement("div");
@@ -2080,7 +2118,6 @@ function renderDashboard() {
 function renderWeekDetail(weekId) {
   const week = WEEKS[weekId - 1];
   const phase = PHASES[week.phase - 1];
-  const status = progress.weekStatus[weekId] || "not-started";
 
   currentView = "week";
   currentWeekId = weekId;
@@ -2101,10 +2138,17 @@ function renderWeekDetail(weekId) {
   document.getElementById("wv-title").textContent = week.title;
   document.getElementById("wv-subtopic").textContent = week.subtopic;
 
-  // Status buttons
-  document.querySelectorAll(".status-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.status === status);
-  });
+  // Day progress bar
+  const weekDays = DAYS.filter(d => d.weekId === weekId);
+  const doneDays = weekDays.filter(d => getDayStatus(d.id) === "completed").length;
+  const dp = document.getElementById("wv-day-progress");
+  if (dp) {
+    const dots = weekDays.map(d => {
+      const s = getDayStatus(d.id);
+      return `<span class="day-prog-dot ${s}" title="Ngày ${d.id}: ${d.title}"></span>`;
+    }).join("");
+    dp.innerHTML = `${dots}<span class="day-prog-label">${doneDays}/${weekDays.length} ngày hoàn thành</span>`;
+  }
 
   // Questions
   const qList = document.getElementById("wv-questions");
@@ -2263,6 +2307,10 @@ function renderDays(weekId) {
     return `
     <div class="day-card" id="day-card-${day.id}">
       <div class="day-card-header" onclick="toggleDayCard(${day.id})">
+        <button class="day-status-btn ${getDayStatus(day.id)}" id="day-status-btn-${day.id}"
+          onclick="event.stopPropagation(); cycleDayStatus(${day.id})"
+          title="${getDayStatus(day.id) === 'completed' ? 'Hoàn thành' : getDayStatus(day.id) === 'in-progress' ? 'Đang học' : 'Chưa bắt đầu'}"
+        >${getDayStatus(day.id) === "completed" ? "✓" : getDayStatus(day.id) === "in-progress" ? "⟳" : ""}</button>
         <span class="day-num-badge">Ngày ${day.id}</span>
         <span class="day-card-title">${escapeHtml(day.title)}</span>
         <span class="day-card-arrow">▾</span>
@@ -2331,18 +2379,38 @@ function navigateNext() {
   if (currentWeekId < 24) navigateToWeek(currentWeekId + 1);
 }
 
-function setWeekStatus(weekId, status) {
-  progress.weekStatus[weekId] = status;
+function cycleDayStatus(dayId) {
+  const cur = getDayStatus(dayId);
+  const next = cur === "not-started" ? "in-progress" : cur === "in-progress" ? "completed" : "not-started";
+  progress.dayStatus[dayId] = next;
   saveProgress();
-  // Update status buttons
-  document.querySelectorAll(".status-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.status === status);
-  });
-  // Update sidebar dot
-  const dot = document.querySelector(`.week-item[data-week-id="${weekId}"] .status-dot`);
-  if (dot) { dot.className = `status-dot ${status}`; }
+  // Update the button in the card
+  const btn = document.getElementById("day-status-btn-" + dayId);
+  if (btn) {
+    btn.className = `day-status-btn ${next}`;
+    btn.textContent = next === "completed" ? "✓" : next === "in-progress" ? "⟳" : "";
+    btn.title = next === "completed" ? "Hoàn thành" : next === "in-progress" ? "Đang học" : "Chưa bắt đầu";
+  }
+  // Update sidebar dot for this week
+  const day = DAYS.find(d => d.id === dayId);
+  if (day) {
+    const weekStatus = getWeekStatusFromDays(day.weekId);
+    const dot = document.querySelector(`.week-item[data-week-id="${day.weekId}"] .status-dot`);
+    if (dot) dot.className = `status-dot ${weekStatus}`;
+    // Update day progress bar in week header
+    const weekDays = DAYS.filter(d => d.weekId === day.weekId);
+    const doneDays = weekDays.filter(d => getDayStatus(d.id) === "completed").length;
+    const dp = document.getElementById("wv-day-progress");
+    if (dp) {
+      const dots = weekDays.map(d => {
+        const s = getDayStatus(d.id);
+        return `<span class="day-prog-dot ${s}" title="Ngày ${d.id}: ${d.title}"></span>`;
+      }).join("");
+      dp.innerHTML = `${dots}<span class="day-prog-label">${doneDays}/${weekDays.length} ngày hoàn thành</span>`;
+    }
+  }
   updateMiniStats();
-  showToast(status === "completed" ? "✓ Hoàn thành tuần này!" : status === "in-progress" ? "⟳ Đánh dấu đang học" : "Đặt lại chưa bắt đầu", status === "completed" ? "success" : "info");
+  if (next === "completed") showToast(`✓ Ngày ${dayId} hoàn thành!`, "success");
 }
 
 function saveHours() {
