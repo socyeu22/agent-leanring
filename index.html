@@ -970,17 +970,34 @@ textarea:focus, input:focus { border-color: var(--blue); }
 .day-prog-dot.in-progress { border-color: var(--blue); background: rgba(59,130,246,0.3); }
 .day-prog-dot.completed { border-color: var(--green); background: var(--green); }
 .day-prog-label { font-size: 12px; color: var(--text-muted); margin-left: 2px; }
-.day-notes-section {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+/* Day document links */
+.day-links-row { display:flex; align-items:flex-start; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); flex-wrap:wrap; }
+.day-links-area { display:flex; align-items:center; gap:5px; flex-wrap:wrap; flex:1; }
+.link-chip { font-size:11px; padding:3px 9px; border-radius:12px; background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-secondary); text-decoration:none; white-space:nowrap; max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+.link-chip:hover { border-color:var(--blue); color:var(--blue); }
+.link-chip-remove { font-size:10px; width:15px; height:15px; border-radius:50%; background:transparent; border:1px solid var(--border-light); color:var(--text-muted); cursor:pointer; margin-left:-3px; padding:0; flex-shrink:0; }
+.link-chip-remove:hover { border-color:#ef4444; color:#ef4444; }
+.btn-add-link { font-size:11px; padding:3px 9px; border-radius:12px; border:1px dashed var(--border-light); color:var(--text-muted); background:transparent; cursor:pointer; white-space:nowrap; }
+.btn-add-link:hover { border-color:var(--blue); color:var(--blue); }
+.add-link-form { display:none; gap:6px; flex-wrap:wrap; margin-top:6px; width:100%; align-items:center; }
+.add-link-form.visible { display:flex; }
+.add-link-url { flex:2; min-width:160px; font-size:12px; padding:5px 8px; border-radius:6px; background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); }
+.add-link-title-input { flex:1; min-width:110px; font-size:12px; padding:5px 8px; border-radius:6px; background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); }
+.add-link-url:focus, .add-link-title-input:focus { border-color:var(--blue); outline:none; }
+.btn-link-save { font-size:12px; padding:4px 12px; border-radius:6px; background:var(--concept); color:#fff; border:none; cursor:pointer; }
+.btn-link-cancel { font-size:12px; padding:4px 10px; border-radius:6px; background:transparent; color:var(--text-muted); border:1px solid var(--border); cursor:pointer; }
+/* Collapsible notes */
+.day-notes-section { margin-top:12px; }
+.day-notes-toggle {
+  display:flex; align-items:center; justify-content:space-between;
+  cursor:pointer; padding:8px 0; color:var(--text-muted); font-size:12px; font-weight:600;
+  border-top:1px solid var(--border); user-select:none;
 }
-.day-notes-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
+.day-notes-toggle:hover { color:var(--text-secondary); }
+.day-notes-arrow { font-size:10px; transition:transform 0.15s; }
+.day-notes-section.notes-open .day-notes-arrow { transform:rotate(180deg); }
+.day-notes-section .notes-wrap { display:none; }
+.day-notes-section.notes-open .notes-wrap { display:block; }
 .reset-notes-btn {
   font-size: 11px;
   padding: 2px 8px;
@@ -1911,7 +1928,7 @@ function debounce(fn, ms) {
 function defaultProgress() {
   const wp = {}, hl = {}, wn = {};
   for (let i = 1; i <= 24; i++) { wp[i] = "not-started"; hl[i] = 0; wn[i] = ""; }
-  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, dayNotes: {}, dayStatus: {}, dayChatLinks: {}, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
+  return { version: 1, weekStatus: wp, hoursLogged: hl, weekNotes: wn, dayNotes: {}, dayStatus: {}, dayChatLinks: {}, dayLinks: {}, settings: { darkMode: true, activeTopicFilter: "all", lastVisitedWeek: null }, startDate: null };
 }
 let progress = defaultProgress();
 
@@ -1925,6 +1942,7 @@ function loadProgress() {
       if (!progress.dayChatLinks) progress.dayChatLinks = {};
       if (!progress.dayNotes) progress.dayNotes = {};
       if (!progress.dayStatus) progress.dayStatus = {};
+      if (!progress.dayLinks) progress.dayLinks = {};
     }
   } catch(e) {}
 }
@@ -2336,8 +2354,15 @@ function renderDays(weekId) {
           <a class="btn-claude-open" href="${claudeUrl(day)}" target="_blank" rel="noopener noreferrer">💬 Học với Claude ↗</a>
           <div class="day-chat-link-area" id="chat-area-${day.id}">${chatAreaInner}</div>
         </div>
-        <div class="day-notes-section">
-          <div class="day-notes-title">📝 Ghi chú ngày ${day.id}</div>
+        <div class="day-links-row" onclick="event.stopPropagation()">
+          <span class="day-section-label">📎 Tài liệu</span>
+          <div class="day-links-area" id="day-links-area-${day.id}"></div>
+        </div>
+        <div class="day-notes-section" id="day-notes-section-${day.id}">
+          <div class="day-notes-toggle" onclick="event.stopPropagation(); toggleDayNotesSection(${day.id})">
+            <span>📝 Ghi chú ngày ${day.id}</span>
+            <span class="day-notes-arrow">▾</span>
+          </div>
           <div class="notes-wrap">
             <div class="notes-tabs">
               <button class="notes-tab active" onclick="switchDayNotesTab(${day.id},'edit')">Chỉnh sửa</button>
@@ -2355,6 +2380,59 @@ function renderDays(weekId) {
     </div>
   `;
   }).join("");
+  days.forEach(d => renderDayLinks(d.id));
+}
+
+// =============================================
+// DAY LINKS
+// =============================================
+function renderDayLinks(dayId) {
+  const area = document.getElementById("day-links-area-" + dayId);
+  if (!area) return;
+  const links = progress.dayLinks[dayId] || [];
+  const chips = links.map((l, i) =>
+    `<a class="link-chip" href="${l.url.replace(/"/g,'%22')}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="${escapeHtml(l.title)}">${escapeHtml(l.title)}</a>` +
+    `<button class="link-chip-remove" onclick="event.stopPropagation();removeDayLink(${dayId},${i})" title="Xóa">×</button>`
+  ).join("");
+  area.innerHTML = chips +
+    `<button class="btn-add-link" id="btn-add-link-${dayId}" onclick="event.stopPropagation();showAddLinkForm(${dayId})">+ Thêm link</button>` +
+    `<div class="add-link-form" id="add-link-form-${dayId}">` +
+      `<input class="add-link-url" id="add-link-url-${dayId}" type="url" placeholder="https://..." />` +
+      `<input class="add-link-title-input" id="add-link-title-${dayId}" type="text" placeholder="Tên tài liệu (tuỳ chọn)" />` +
+      `<button class="btn-link-save" onclick="event.stopPropagation();submitAddLink(${dayId})">Lưu</button>` +
+      `<button class="btn-link-cancel" onclick="event.stopPropagation();hideAddLinkForm(${dayId})">Hủy</button>` +
+    `</div>`;
+}
+function showAddLinkForm(dayId) {
+  const f = document.getElementById("add-link-form-" + dayId);
+  if (f) { f.classList.add("visible"); document.getElementById("add-link-url-" + dayId).focus(); }
+}
+function hideAddLinkForm(dayId) {
+  const f = document.getElementById("add-link-form-" + dayId);
+  if (f) { f.classList.remove("visible"); }
+}
+function submitAddLink(dayId) {
+  const urlEl = document.getElementById("add-link-url-" + dayId);
+  const titleEl = document.getElementById("add-link-title-" + dayId);
+  const url = urlEl ? urlEl.value.trim() : "";
+  const title = titleEl ? titleEl.value.trim() : "";
+  if (!url) return;
+  if (!progress.dayLinks[dayId]) progress.dayLinks[dayId] = [];
+  progress.dayLinks[dayId].push({ url, title: title || url });
+  saveProgress();
+  renderDayLinks(dayId);
+  showToast("Đã thêm tài liệu", "success");
+}
+function removeDayLink(dayId, idx) {
+  if (!progress.dayLinks[dayId]) return;
+  progress.dayLinks[dayId].splice(idx, 1);
+  saveProgress();
+  renderDayLinks(dayId);
+}
+function toggleDayNotesSection(dayId) {
+  const sec = document.getElementById("day-notes-section-" + dayId);
+  if (!sec) return;
+  sec.classList.toggle("notes-open");
 }
 
 // =============================================
