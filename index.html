@@ -2154,8 +2154,11 @@ async function syncFromCloud(userId) {
       const localTs = progress._updatedAt || 0;
       const cloudTs = cloudData._updatedAt || 0;
 
-      if (cloudTs > localTs) {
-        // Cloud mới hơn → kéo về
+      if (localTs > cloudTs) {
+        // Local chắc chắn mới hơn → push lên cloud
+        await syncToCloud();
+      } else {
+        // Cloud mới hơn, bằng nhau, hoặc cả hai = 0 → luôn pull từ cloud (an toàn hơn)
         progress = { ...defaultProgress(), ...cloudData };
         progress.settings = { ...defaultProgress().settings, ...(cloudData.settings || {}) };
         if (!progress.dayChatLinks) progress.dayChatLinks = {};
@@ -2163,9 +2166,6 @@ async function syncFromCloud(userId) {
         if (!progress.dayStatus) progress.dayStatus = {};
         if (!progress.dayLinks) progress.dayLinks = {};
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch(e) {}
-      } else {
-        // Local mới hơn hoặc bằng → đẩy local lên cloud
-        await syncToCloud();
       }
     } else {
       // Cloud chưa có data → đẩy local lên
