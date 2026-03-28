@@ -2139,12 +2139,16 @@ function setSyncStatus(status) {
   else if (status === "error") { el.className = "sync-indicator error"; el.textContent = "☁ Lỗi sync"; }
 }
 
+let currentUserId = null; // cache user id after login
+
 async function syncFromCloud(userId) {
+  currentUserId = userId;
   try {
     const { data, error } = await supabaseClient
       .from("progress").select("data").eq("user_id", userId).single();
     if (error && error.code !== "PGRST116") throw error; // PGRST116 = not found
     if (data?.data) {
+      // Cloud có data → kéo về
       const stored = data.data;
       progress = { ...defaultProgress(), ...stored };
       progress.settings = { ...defaultProgress().settings, ...(stored.settings || {}) };
@@ -2153,18 +2157,19 @@ async function syncFromCloud(userId) {
       if (!progress.dayStatus) progress.dayStatus = {};
       if (!progress.dayLinks) progress.dayLinks = {};
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch(e) {}
+    } else {
+      // Cloud chưa có data → đẩy data local lên ngay
+      await syncToCloud();
     }
-  } catch(e) { console.error("syncFromCloud error:", e); }
+  } catch(e) { console.error("syncFromCloud error:", e); setSyncStatus("error"); }
 }
 
 async function syncToCloud() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !currentUserId) return;
   try {
     setSyncStatus("syncing");
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) return;
     const { error } = await supabaseClient.from("progress").upsert({
-      user_id: user.id,
+      user_id: currentUserId,
       data: progress,
       updated_at: new Date().toISOString()
     });
@@ -2894,6 +2899,7 @@ async function init() {
           if (lw) renderWeekDetail(lw); else renderDashboard();
           showToast("✓ Đã đăng nhập & đồng bộ dữ liệu", "success");
         } else if (event === "SIGNED_OUT") {
+          currentUserId = null;
           renderAuthUI(null);
         }
       });
