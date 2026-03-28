@@ -2045,8 +2045,9 @@ function loadProgress() {
   } catch(e) {}
 }
 function saveProgress() {
+  progress._updatedAt = Date.now(); // timestamp để so sánh khi sync
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch(e) {}
-  if (supabaseClient) debouncedSyncToCloud();
+  if (supabaseClient && currentUserId) debouncedSyncToCloud();
 }
 const debouncedSave = debounce(saveProgress, 400);
 
@@ -2146,19 +2147,28 @@ async function syncFromCloud(userId) {
   try {
     const { data, error } = await supabaseClient
       .from("progress").select("data").eq("user_id", userId).single();
-    if (error && error.code !== "PGRST116") throw error; // PGRST116 = not found
+    if (error && error.code !== "PGRST116") throw error;
+
     if (data?.data) {
-      // Cloud có data → kéo về
-      const stored = data.data;
-      progress = { ...defaultProgress(), ...stored };
-      progress.settings = { ...defaultProgress().settings, ...(stored.settings || {}) };
-      if (!progress.dayChatLinks) progress.dayChatLinks = {};
-      if (!progress.dayNotes) progress.dayNotes = {};
-      if (!progress.dayStatus) progress.dayStatus = {};
-      if (!progress.dayLinks) progress.dayLinks = {};
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch(e) {}
+      const cloudData = data.data;
+      const localTs = progress._updatedAt || 0;
+      const cloudTs = cloudData._updatedAt || 0;
+
+      if (cloudTs > localTs) {
+        // Cloud mới hơn → kéo về
+        progress = { ...defaultProgress(), ...cloudData };
+        progress.settings = { ...defaultProgress().settings, ...(cloudData.settings || {}) };
+        if (!progress.dayChatLinks) progress.dayChatLinks = {};
+        if (!progress.dayNotes) progress.dayNotes = {};
+        if (!progress.dayStatus) progress.dayStatus = {};
+        if (!progress.dayLinks) progress.dayLinks = {};
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch(e) {}
+      } else {
+        // Local mới hơn hoặc bằng → đẩy local lên cloud
+        await syncToCloud();
+      }
     } else {
-      // Cloud chưa có data → đẩy data local lên ngay
+      // Cloud chưa có data → đẩy local lên
       await syncToCloud();
     }
   } catch(e) { console.error("syncFromCloud error:", e); setSyncStatus("error"); }
@@ -2180,7 +2190,7 @@ async function syncToCloud() {
     console.error("syncToCloud error:", e);
   }
 }
-const debouncedSyncToCloud = debounce(syncToCloud, 2000);
+const debouncedSyncToCloud = debounce(syncToCloud, 800);
 
 // =============================================
 // COMPUTED
@@ -2891,13 +2901,17 @@ async function init() {
         setSyncStatus("synced");
       }
       supabaseClient.auth.onAuthStateChange(async (event, session) => {
-        if (event === "SIGNED_IN" && session?.user) {
+        // Chỉ sync khi user thực sự đăng nhập mới (không sync khi token tự refresh)
+        if (event === "SIGNED_IN" && session?.user && !currentUserId) {
           await syncFromCloud(session.user.id);
           renderAuthUI(session.user);
           setSyncStatus("synced");
           const lw = progress.settings?.lastVisitedWeek;
           if (lw) renderWeekDetail(lw); else renderDashboard();
           showToast("✓ Đã đăng nhập & đồng bộ dữ liệu", "success");
+        } else if (event === "TOKEN_REFRESHED" && session?.user) {
+          // Token refresh: chỉ cập nhật userId, không kéo data về
+          currentUserId = session.user.id;
         } else if (event === "SIGNED_OUT") {
           currentUserId = null;
           renderAuthUI(null);
