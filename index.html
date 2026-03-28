@@ -1091,22 +1091,6 @@ textarea:focus, input:focus { border-color: var(--blue); }
     <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
   </nav>
 
-  <!-- Supabase Setup Modal -->
-  <div class="modal-overlay" id="setup-modal">
-    <div class="modal-box">
-      <div class="modal-title">⚙️ Cấu hình Supabase</div>
-      <p class="modal-desc">Nhập thông tin từ Supabase Dashboard → Settings → API để bật tính năng đồng bộ đa thiết bị.</p>
-      <label class="modal-label">Project URL</label>
-      <input class="modal-input" id="sb-url-input" type="url" placeholder="https://xxxx.supabase.co" />
-      <label class="modal-label">Anon Key</label>
-      <input class="modal-input" id="sb-key-input" type="text" placeholder="eyJhbGci..." />
-      <div class="modal-actions">
-        <button class="modal-btn-skip" onclick="closeSetupModal()">Bỏ qua</button>
-        <button class="modal-btn-save" onclick="saveSupabaseConfig()">Lưu & tiếp tục</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Auth Modal (login / register) -->
   <div class="modal-overlay" id="auth-modal">
     <div class="modal-box">
@@ -2071,34 +2055,14 @@ const debouncedSave = debounce(saveProgress, 400);
 // =============================================
 let supabaseClient = null;
 
-function initSupabase() {
-  const url = localStorage.getItem("sb_url");
-  const key = localStorage.getItem("sb_key");
-  if (url && key) {
-    supabaseClient = supabase.createClient(url, key);
-  }
-}
+const SUPABASE_URL = "https://fhmsclrvprirbnxhrowg.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZobXNjbHJ2cHJpcmJueGhyb3dnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Njc1MzksImV4cCI6MjA5MDI0MzUzOX0.HGmlbDXahjhsuuB9tSJAE7IwO30RRfLnUqaEa7UGt9M";
 
-function showSetupModal() {
-  document.getElementById("setup-modal").classList.add("visible");
-}
-function closeSetupModal() {
-  document.getElementById("setup-modal").classList.remove("visible");
-}
-function saveSupabaseConfig() {
-  const url = document.getElementById("sb-url-input").value.trim();
-  const key = document.getElementById("sb-key-input").value.trim();
-  if (!url || !key) { showToast("Vui lòng nhập đủ URL và Key", "info"); return; }
-  localStorage.setItem("sb_url", url);
-  localStorage.setItem("sb_key", key);
-  closeSetupModal();
-  initSupabase();
-  renderAuthUI(null);
-  showToast("Đã lưu cấu hình Supabase!", "success");
+function initSupabase() {
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
 function handleAuthClick() {
-  if (!supabaseClient) { showSetupModal(); return; }
   showAuthModal();
 }
 
@@ -2152,10 +2116,6 @@ async function signOut() {
 function renderAuthUI(user) {
   const area = document.getElementById("auth-area");
   if (!area) return;
-  if (!supabaseClient) {
-    area.innerHTML = `<span class="sync-indicator">☁ Chưa cấu hình</span><button class="auth-btn" onclick="showSetupModal()">⚙️ Cài đặt</button>`;
-    return;
-  }
   if (user) {
     const email = user.email || "User";
     const initial = email.charAt(0).toUpperCase();
