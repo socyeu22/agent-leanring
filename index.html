@@ -193,6 +193,10 @@ textarea:focus, input:focus { border-color: var(--blue); }
 .modal-btn-skip { font-size:13px; padding:7px 16px; border-radius:var(--radius-sm); border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; }
 .modal-btn-save { font-size:13px; padding:7px 16px; border-radius:var(--radius-sm); border:none; background:var(--concept); color:#fff; cursor:pointer; font-weight:600; }
 .modal-btn-save:hover { background:#6d28d9; }
+.auth-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:2px; }
+.auth-tab { flex:1; padding:10px; font-size:13px; font-weight:600; color:var(--text-muted); background:transparent; border:none; cursor:pointer; border-bottom:2px solid transparent; transition:var(--transition); }
+.auth-tab.active { color:var(--concept); border-bottom-color:var(--concept); }
+.auth-error { font-size:12px; color:#ef4444; min-height:18px; margin:4px 0 0; }
 
 /* ===== BODY LAYOUT ===== */
 #layout {
@@ -1098,7 +1102,39 @@ textarea:focus, input:focus { border-color: var(--blue); }
       <input class="modal-input" id="sb-key-input" type="text" placeholder="eyJhbGci..." />
       <div class="modal-actions">
         <button class="modal-btn-skip" onclick="closeSetupModal()">Bỏ qua</button>
-        <button class="modal-btn-save" onclick="saveSupabaseConfig()">Lưu & kết nối</button>
+        <button class="modal-btn-save" onclick="saveSupabaseConfig()">Lưu & tiếp tục</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Modal (login / register) -->
+  <div class="modal-overlay" id="auth-modal">
+    <div class="modal-box">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Đăng nhập</button>
+        <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Đăng ký</button>
+      </div>
+      <div id="auth-form-login">
+        <label class="modal-label" style="margin-top:16px">Email</label>
+        <input class="modal-input" id="login-email" type="email" placeholder="you@example.com" />
+        <label class="modal-label">Mật khẩu</label>
+        <input class="modal-input" id="login-password" type="password" placeholder="••••••••" />
+        <p class="auth-error" id="login-error"></p>
+        <div class="modal-actions">
+          <button class="modal-btn-skip" onclick="closeAuthModal()">Hủy</button>
+          <button class="modal-btn-save" onclick="doSignIn()">Đăng nhập</button>
+        </div>
+      </div>
+      <div id="auth-form-register" style="display:none">
+        <label class="modal-label" style="margin-top:16px">Email</label>
+        <input class="modal-input" id="reg-email" type="email" placeholder="you@example.com" />
+        <label class="modal-label">Mật khẩu</label>
+        <input class="modal-input" id="reg-password" type="password" placeholder="Tối thiểu 6 ký tự" />
+        <p class="auth-error" id="reg-error"></p>
+        <div class="modal-actions">
+          <button class="modal-btn-skip" onclick="closeAuthModal()">Hủy</button>
+          <button class="modal-btn-save" onclick="doSignUp()">Tạo tài khoản</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2063,14 +2099,48 @@ function saveSupabaseConfig() {
 
 function handleAuthClick() {
   if (!supabaseClient) { showSetupModal(); return; }
-  signInWithGoogle();
+  showAuthModal();
 }
 
-async function signInWithGoogle() {
-  await supabaseClient.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: window.location.origin + window.location.pathname }
-  });
+function showAuthModal() {
+  document.getElementById("auth-modal").classList.add("visible");
+  switchAuthTab("login");
+}
+function closeAuthModal() {
+  document.getElementById("auth-modal").classList.remove("visible");
+  document.getElementById("login-error").textContent = "";
+  document.getElementById("reg-error").textContent = "";
+}
+function switchAuthTab(tab) {
+  const isLogin = tab === "login";
+  document.getElementById("auth-form-login").style.display = isLogin ? "" : "none";
+  document.getElementById("auth-form-register").style.display = isLogin ? "none" : "";
+  document.getElementById("tab-login").classList.toggle("active", isLogin);
+  document.getElementById("tab-register").classList.toggle("active", !isLogin);
+}
+
+async function doSignIn() {
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const errEl = document.getElementById("login-error");
+  errEl.textContent = "";
+  if (!email || !password) { errEl.textContent = "Vui lòng nhập email và mật khẩu."; return; }
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) { errEl.textContent = error.message === "Invalid login credentials" ? "Email hoặc mật khẩu không đúng." : error.message; return; }
+  closeAuthModal();
+}
+
+async function doSignUp() {
+  const email = document.getElementById("reg-email").value.trim();
+  const password = document.getElementById("reg-password").value;
+  const errEl = document.getElementById("reg-error");
+  errEl.textContent = "";
+  if (!email || !password) { errEl.textContent = "Vui lòng nhập email và mật khẩu."; return; }
+  if (password.length < 6) { errEl.textContent = "Mật khẩu phải có ít nhất 6 ký tự."; return; }
+  const { error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) { errEl.textContent = error.message; return; }
+  errEl.style.color = "var(--green)";
+  errEl.textContent = "Tài khoản đã tạo! Kiểm tra email để xác nhận (nếu được yêu cầu).";
 }
 
 async function signOut() {
@@ -2087,16 +2157,13 @@ function renderAuthUI(user) {
     return;
   }
   if (user) {
-    const name = user.user_metadata?.full_name || user.email || "User";
-    const avatar = user.user_metadata?.avatar_url;
-    const avatarHtml = avatar
-      ? `<img src="${avatar}" alt="">`
-      : name.charAt(0).toUpperCase();
+    const email = user.email || "User";
+    const initial = email.charAt(0).toUpperCase();
     area.innerHTML = `
       <span class="sync-indicator synced" id="sync-indicator">☁ Đã đồng bộ</span>
       <div class="user-pill">
-        <div class="user-avatar">${avatarHtml}</div>
-        <span class="user-name" title="${name}">${name}</span>
+        <div class="user-avatar">${initial}</div>
+        <span class="user-name" title="${email}">${email}</span>
         <button class="signout-btn" onclick="signOut()">Đăng xuất</button>
       </div>`;
   } else {
