@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Agent — Lộ Trình 24 Tuần</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 /* ===== DESIGN TOKENS ===== */
 :root {
@@ -135,6 +136,63 @@ textarea:focus, input:focus { border-color: var(--blue); }
   transition: var(--transition);
 }
 #theme-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ===== AUTH UI ===== */
+#auth-area { display:flex; align-items:center; gap:8px; margin-right:4px; }
+.auth-btn {
+  font-size:12px; font-weight:600; padding:5px 12px;
+  border-radius:var(--radius-sm); border:1px solid var(--border-light);
+  background:transparent; color:var(--text-secondary); cursor:pointer;
+  transition:var(--transition); white-space:nowrap;
+}
+.auth-btn:hover { border-color:var(--concept); color:var(--concept); }
+.user-pill {
+  display:flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--text-secondary);
+}
+.user-avatar {
+  width:24px; height:24px; border-radius:50%;
+  background:var(--concept); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; flex-shrink:0; overflow:hidden;
+}
+.user-avatar img { width:100%; height:100%; object-fit:cover; }
+.user-name { max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.signout-btn {
+  font-size:11px; padding:3px 8px; border-radius:4px;
+  border:1px solid var(--border); background:transparent;
+  color:var(--text-muted); cursor:pointer;
+}
+.signout-btn:hover { border-color:#ef4444; color:#ef4444; }
+.sync-indicator { font-size:11px; color:var(--text-muted); white-space:nowrap; }
+.sync-indicator.syncing { color:var(--blue); }
+.sync-indicator.synced { color:var(--green); }
+.sync-indicator.error { color:#ef4444; }
+
+/* ===== SETUP MODAL ===== */
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:1000;
+  background:rgba(0,0,0,0.7); align-items:center; justify-content:center;
+}
+.modal-overlay.visible { display:flex; }
+.modal-box {
+  background:var(--bg-card); border:1px solid var(--border-light);
+  border-radius:var(--radius); padding:28px 32px; width:100%; max-width:440px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-title { font-size:17px; font-weight:700; color:var(--text-primary); margin-bottom:8px; }
+.modal-desc { font-size:13px; color:var(--text-muted); margin-bottom:20px; line-height:1.6; }
+.modal-label { display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; }
+.modal-input {
+  width:100%; padding:8px 10px; margin-bottom:14px;
+  background:var(--bg-secondary); border:1px solid var(--border);
+  border-radius:var(--radius-sm); color:var(--text-primary); font-size:13px;
+}
+.modal-input:focus { border-color:var(--blue); outline:none; }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:4px; }
+.modal-btn-skip { font-size:13px; padding:7px 16px; border-radius:var(--radius-sm); border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; }
+.modal-btn-save { font-size:13px; padding:7px 16px; border-radius:var(--radius-sm); border:none; background:var(--concept); color:#fff; cursor:pointer; font-weight:600; }
+.modal-btn-save:hover { background:#6d28d9; }
 
 /* ===== BODY LAYOUT ===== */
 #layout {
@@ -1022,8 +1080,28 @@ textarea:focus, input:focus { border-color: var(--blue); }
       <button class="filter-pill" data-filter="code">Code</button>
       <button class="filter-pill" data-filter="eval">Eval</button>
     </div>
+    <div id="auth-area">
+      <span class="sync-indicator" id="sync-indicator"></span>
+      <button class="auth-btn" id="auth-btn" onclick="handleAuthClick()">🔑 Đăng nhập</button>
+    </div>
     <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
   </nav>
+
+  <!-- Supabase Setup Modal -->
+  <div class="modal-overlay" id="setup-modal">
+    <div class="modal-box">
+      <div class="modal-title">⚙️ Cấu hình Supabase</div>
+      <p class="modal-desc">Nhập thông tin từ Supabase Dashboard → Settings → API để bật tính năng đồng bộ đa thiết bị.</p>
+      <label class="modal-label">Project URL</label>
+      <input class="modal-input" id="sb-url-input" type="url" placeholder="https://xxxx.supabase.co" />
+      <label class="modal-label">Anon Key</label>
+      <input class="modal-input" id="sb-key-input" type="text" placeholder="eyJhbGci..." />
+      <div class="modal-actions">
+        <button class="modal-btn-skip" onclick="closeSetupModal()">Bỏ qua</button>
+        <button class="modal-btn-save" onclick="saveSupabaseConfig()">Lưu & kết nối</button>
+      </div>
+    </div>
+  </div>
 
   <div id="layout">
     <!-- SIDEBAR -->
@@ -1948,8 +2026,129 @@ function loadProgress() {
 }
 function saveProgress() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch(e) {}
+  if (supabaseClient) debouncedSyncToCloud();
 }
 const debouncedSave = debounce(saveProgress, 400);
+
+// =============================================
+// SUPABASE
+// =============================================
+let supabaseClient = null;
+
+function initSupabase() {
+  const url = localStorage.getItem("sb_url");
+  const key = localStorage.getItem("sb_key");
+  if (url && key) {
+    supabaseClient = supabase.createClient(url, key);
+  }
+}
+
+function showSetupModal() {
+  document.getElementById("setup-modal").classList.add("visible");
+}
+function closeSetupModal() {
+  document.getElementById("setup-modal").classList.remove("visible");
+}
+function saveSupabaseConfig() {
+  const url = document.getElementById("sb-url-input").value.trim();
+  const key = document.getElementById("sb-key-input").value.trim();
+  if (!url || !key) { showToast("Vui lòng nhập đủ URL và Key", "info"); return; }
+  localStorage.setItem("sb_url", url);
+  localStorage.setItem("sb_key", key);
+  closeSetupModal();
+  initSupabase();
+  renderAuthUI(null);
+  showToast("Đã lưu cấu hình Supabase!", "success");
+}
+
+function handleAuthClick() {
+  if (!supabaseClient) { showSetupModal(); return; }
+  signInWithGoogle();
+}
+
+async function signInWithGoogle() {
+  await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.origin + window.location.pathname }
+  });
+}
+
+async function signOut() {
+  await supabaseClient.auth.signOut();
+  renderAuthUI(null);
+  showToast("Đã đăng xuất", "info");
+}
+
+function renderAuthUI(user) {
+  const area = document.getElementById("auth-area");
+  if (!area) return;
+  if (!supabaseClient) {
+    area.innerHTML = `<span class="sync-indicator">☁ Chưa cấu hình</span><button class="auth-btn" onclick="showSetupModal()">⚙️ Cài đặt</button>`;
+    return;
+  }
+  if (user) {
+    const name = user.user_metadata?.full_name || user.email || "User";
+    const avatar = user.user_metadata?.avatar_url;
+    const avatarHtml = avatar
+      ? `<img src="${avatar}" alt="">`
+      : name.charAt(0).toUpperCase();
+    area.innerHTML = `
+      <span class="sync-indicator synced" id="sync-indicator">☁ Đã đồng bộ</span>
+      <div class="user-pill">
+        <div class="user-avatar">${avatarHtml}</div>
+        <span class="user-name" title="${name}">${name}</span>
+        <button class="signout-btn" onclick="signOut()">Đăng xuất</button>
+      </div>`;
+  } else {
+    area.innerHTML = `<span class="sync-indicator" id="sync-indicator"></span><button class="auth-btn" id="auth-btn" onclick="handleAuthClick()">🔑 Đăng nhập</button>`;
+  }
+}
+
+function setSyncStatus(status) {
+  const el = document.getElementById("sync-indicator");
+  if (!el) return;
+  if (status === "syncing") { el.className = "sync-indicator syncing"; el.textContent = "☁ Đang lưu..."; }
+  else if (status === "synced") { el.className = "sync-indicator synced"; el.textContent = "☁ Đã đồng bộ"; }
+  else if (status === "error") { el.className = "sync-indicator error"; el.textContent = "☁ Lỗi sync"; }
+}
+
+async function syncFromCloud(userId) {
+  try {
+    const { data, error } = await supabaseClient
+      .from("progress").select("data").eq("user_id", userId).single();
+    if (error && error.code !== "PGRST116") throw error; // PGRST116 = not found
+    if (data?.data) {
+      const stored = data.data;
+      progress = { ...defaultProgress(), ...stored };
+      progress.settings = { ...defaultProgress().settings, ...(stored.settings || {}) };
+      if (!progress.dayChatLinks) progress.dayChatLinks = {};
+      if (!progress.dayNotes) progress.dayNotes = {};
+      if (!progress.dayStatus) progress.dayStatus = {};
+      if (!progress.dayLinks) progress.dayLinks = {};
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch(e) {}
+    }
+  } catch(e) { console.error("syncFromCloud error:", e); }
+}
+
+async function syncToCloud() {
+  if (!supabaseClient) return;
+  try {
+    setSyncStatus("syncing");
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+    const { error } = await supabaseClient.from("progress").upsert({
+      user_id: user.id,
+      data: progress,
+      updated_at: new Date().toISOString()
+    });
+    if (error) throw error;
+    setSyncStatus("synced");
+  } catch(e) {
+    setSyncStatus("error");
+    console.error("syncToCloud error:", e);
+  }
+}
+const debouncedSyncToCloud = debounce(syncToCloud, 2000);
 
 // =============================================
 // COMPUTED
@@ -2640,7 +2839,8 @@ function showToast(msg, type = "info") {
 // =============================================
 // INIT
 // =============================================
-function init() {
+async function init() {
+  initSupabase();
   loadProgress();
 
   // Apply theme
@@ -2648,13 +2848,37 @@ function init() {
   document.documentElement.dataset.theme = isDark ? "dark" : "light";
   document.getElementById("theme-toggle").textContent = isDark ? "🌙" : "☀️";
 
-  // Navigate to last visited week or dashboard
-  const lastWeek = progress.settings?.lastVisitedWeek;
-  if (lastWeek) {
-    renderWeekDetail(lastWeek);
+  // Auth setup
+  if (supabaseClient) {
+    renderAuthUI(null);
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session?.user) {
+        await syncFromCloud(session.user.id);
+        renderAuthUI(session.user);
+        setSyncStatus("synced");
+      }
+      supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          await syncFromCloud(session.user.id);
+          renderAuthUI(session.user);
+          setSyncStatus("synced");
+          const lw = progress.settings?.lastVisitedWeek;
+          if (lw) renderWeekDetail(lw); else renderDashboard();
+          showToast("✓ Đã đăng nhập & đồng bộ dữ liệu", "success");
+        } else if (event === "SIGNED_OUT") {
+          renderAuthUI(null);
+        }
+      });
+    } catch(e) { console.error("Auth init error:", e); }
   } else {
-    renderDashboard();
+    renderAuthUI(null);
   }
+
+  // Navigate
+  const lastWeek = progress.settings?.lastVisitedWeek;
+  if (lastWeek) renderWeekDetail(lastWeek);
+  else renderDashboard();
 }
 
 document.addEventListener("DOMContentLoaded", init);
